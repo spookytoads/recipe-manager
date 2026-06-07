@@ -11,9 +11,11 @@ export const SEED_RECIPES: Recipe[] = [
     cuisine: 'Mediterranean',
     protein: ['chicken'],
     servings: 4,
+    servingSize: '1/4 chicken + potatoes',
     prepTime: '20 min',
     cookTime: '1 hr 10 min',
     tags: ['dinner', 'roast', 'gluten-free', 'one-pan'],
+    nutrition: { calories: 610, protein: 52, carbs: 28, fat: 32, fiber: 4, sodium: 720 },
     sourceFile: 'sample-lemon-herb-chicken.pdf',
     ingredients: [
       { id: 'lhc-i1', name: 'whole chicken', quantity: 1, unit: 'whole', category: 'Proteins' },
@@ -42,9 +44,11 @@ export const SEED_RECIPES: Recipe[] = [
     cuisine: 'Mexican',
     protein: ['beef'],
     servings: 4,
+    servingSize: '3 tacos',
     prepTime: '15 min',
     cookTime: '20 min',
     tags: ['dinner', 'quick', 'family-favorite'],
+    nutrition: { calories: 540, protein: 31, carbs: 41, fat: 27, fiber: 6, sugar: 4, sodium: 680 },
     sourceFile: 'sample-beef-tacos.pdf',
     ingredients: [
       { id: 'bt-i1', name: 'ground beef', quantity: 1, unit: 'lb', category: 'Proteins' },

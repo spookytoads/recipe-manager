@@ -32,17 +32,46 @@ export interface Step {
   timerSeconds?: number
 }
 
+/** Per-serving nutrition. All fields optional — only populated when the recipe states them. */
+export interface Nutrition {
+  /** kcal per serving */
+  calories?: number
+  /** grams per serving */
+  protein?: number
+  carbs?: number
+  fat?: number
+  fiber?: number
+  sugar?: number
+  /** milligrams per serving */
+  sodium?: number
+}
+
+/** Ordered list of nutrition fields with display labels and units. */
+export const NUTRITION_FIELDS: { key: keyof Nutrition; label: string; unit: string }[] = [
+  { key: 'calories', label: 'Calories', unit: '' },
+  { key: 'protein', label: 'Protein', unit: 'g' },
+  { key: 'carbs', label: 'Carbs', unit: 'g' },
+  { key: 'fat', label: 'Fat', unit: 'g' },
+  { key: 'fiber', label: 'Fiber', unit: 'g' },
+  { key: 'sugar', label: 'Sugar', unit: 'g' },
+  { key: 'sodium', label: 'Sodium', unit: 'mg' },
+]
+
 export interface Recipe {
   id: string
   title: string
   cuisine: string
   protein: string[]
   servings: number
+  /** Optional description of one serving, e.g. "1 cup (240g)". */
+  servingSize?: string
   cookTime: string
   prepTime: string
   ingredients: Ingredient[]
   steps: Step[]
   tags: string[]
+  /** Per-serving nutrition, only present when the recipe provides it. */
+  nutrition?: Nutrition
   sourceFile: string
 }
 

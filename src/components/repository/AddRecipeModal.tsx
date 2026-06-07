@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { CATEGORIES, type Category, type Recipe } from '../../types'
+import { CATEGORIES, NUTRITION_FIELDS, type Category, type Nutrition, type Recipe } from '../../types'
 import { extractRecipesFromText, RecipeExtractionError } from '../../lib/extraction'
 import { uid } from '../../lib/util'
 import { AlertIcon, CloseIcon, PlusIcon, TrashIcon } from '../ui/icons'
@@ -32,10 +32,12 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('')
   const [cuisine, setCuisine] = useState('')
   const [servings, setServings] = useState('4')
+  const [servingSize, setServingSize] = useState('')
   const [prepTime, setPrepTime] = useState('')
   const [cookTime, setCookTime] = useState('')
   const [proteinInput, setProteinInput] = useState('')
   const [tagsInput, setTagsInput] = useState('')
+  const [macros, setMacros] = useState<Record<string, string>>({})
   const [ingredients, setIngredients] = useState<IngRow[]>([emptyIng()])
   const [steps, setSteps] = useState<StepRow[]>([emptyStep()])
   const [error, setError] = useState<string | null>(null)
@@ -67,10 +69,19 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
     setTitle(r.title === 'Untitled Recipe' ? '' : r.title)
     setCuisine(r.cuisine === 'Other' ? '' : r.cuisine)
     setServings(String(r.servings))
+    setServingSize(r.servingSize ?? '')
     setPrepTime(r.prepTime === '—' ? '' : r.prepTime)
     setCookTime(r.cookTime === '—' ? '' : r.cookTime)
     setProteinInput(r.protein.join(', '))
     setTagsInput(r.tags.join(', '))
+    const m: Record<string, string> = {}
+    if (r.nutrition) {
+      for (const { key } of NUTRITION_FIELDS) {
+        const v = r.nutrition[key]
+        if (typeof v === 'number') m[key] = String(v)
+      }
+    }
+    setMacros(m)
     setIngredients(
       r.ingredients.length
         ? r.ingredients.map((i) => ({
@@ -119,12 +130,24 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
       setError('Please give the recipe a title.')
       return
     }
+    const nutrition: Nutrition = {}
+    let anyMacro = false
+    for (const { key } of NUTRITION_FIELDS) {
+      const raw = macros[key]
+      const v = Number(raw)
+      if (raw?.trim() && isFinite(v) && v > 0) {
+        nutrition[key] = v
+        anyMacro = true
+      }
+    }
+
     const recipe: Recipe = {
       id: uid('recipe'),
       title: title.trim(),
       cuisine: cuisine.trim() || 'Other',
       protein: splitCsv(proteinInput.toLowerCase()),
       servings: Math.max(1, Math.round(Number(servings) || 4)),
+      ...(servingSize.trim() ? { servingSize: servingSize.trim() } : {}),
       cookTime: cookTime.trim() || '—',
       prepTime: prepTime.trim() || '—',
       ingredients: ingredients
@@ -148,6 +171,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
           }
         }),
       tags: splitCsv(tagsInput),
+      ...(anyMacro ? { nutrition } : {}),
       sourceFile: 'manual-entry',
     }
     addRecipe(recipe)
@@ -241,6 +265,15 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
                 className={inputClass}
               />
             </label>
+            <label className="flex flex-col gap-1.5 sm:col-span-2">
+              <span className="text-xs font-semibold text-slate-500">Serving size (optional)</span>
+              <input
+                value={servingSize}
+                onChange={(e) => setServingSize(e.target.value)}
+                placeholder="e.g. 1 cup (240g) or 3 tacos"
+                className={inputClass}
+              />
+            </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold text-slate-500">Prep time</span>
               <input value={prepTime} onChange={(e) => setPrepTime(e.target.value)} placeholder="15 min" className={inputClass} />
@@ -257,6 +290,30 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
               <span className="text-xs font-semibold text-slate-500">Tags (comma-separated)</span>
               <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="dinner, quick" className={inputClass} />
             </label>
+          </section>
+
+          {/* Nutrition (optional, per serving) */}
+          <section>
+            <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Nutrition <span className="font-medium normal-case text-slate-400">· per serving, optional</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {NUTRITION_FIELDS.map(({ key, label, unit }) => (
+                <label key={key} className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {label}
+                    {unit ? ` (${unit})` : ''}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={macros[key] ?? ''}
+                    onChange={(e) => setMacros((prev) => ({ ...prev, [key]: e.target.value }))}
+                    className={`${inputClass} px-2.5 py-2 text-center`}
+                  />
+                </label>
+              ))}
+            </div>
           </section>
 
           {/* Ingredients */}

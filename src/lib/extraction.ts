@@ -1,5 +1,5 @@
-import type { Category, Ingredient, Recipe, Step } from '../types'
-import { CATEGORIES } from '../types'
+import type { Category, Ingredient, Nutrition, Recipe, Step } from '../types'
+import { CATEGORIES, NUTRITION_FIELDS } from '../types'
 import { uid } from './util'
 
 // Google Gemini — free tier reads PDFs (up to 1000 pages) and returns JSON.
@@ -17,7 +17,7 @@ const CHUNK_PAGES = 10
 const MAX_TOKENS = 24000
 
 const SYSTEM_PROMPT =
-  'You are a recipe extraction assistant. The input (a PDF or pasted text) may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category }], steps: [{ id, order, instruction, timerSeconds }], tags[] }. If the input contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other.'
+  'You are a recipe extraction assistant. The input (a PDF or pasted text) may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, servingSize, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category }], steps: [{ id, order, instruction, timerSeconds }], tags[], nutrition: { calories, protein, carbs, fat, fiber, sugar, sodium } }. If the input contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. Preserve each ingredient\'s unit exactly as written (g, cups, tbsp, tsp, oz, etc.). For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other. For servingSize, copy the recipe\'s stated serving description (e.g. "1 cup (240g)") if given, else omit it. CRITICAL: include the "nutrition" object ONLY if the recipe explicitly prints nutrition facts — NEVER estimate, calculate, or invent nutrition values. If no nutrition information is printed, omit the nutrition field entirely. Nutrition is PER SERVING: calories in kcal; protein, carbs, fat, fiber, sugar in grams; sodium in milligrams.'
 
 export class RecipeExtractionError extends Error {}
 
@@ -78,6 +78,28 @@ function asCategory(value: unknown): Category {
   return match ?? 'Other'
 }
 
+/** Coerce a nutrition object, keeping only positive numeric fields. Returns undefined if empty. */
+function asNutrition(raw: unknown): Nutrition | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const n = raw as Record<string, unknown>
+  // Accept a couple of common aliases the model might emit.
+  const aliased: Record<string, unknown> = {
+    ...n,
+    calories: n.calories ?? n.kcal ?? n.cal,
+    carbs: n.carbs ?? n.carbohydrates ?? n.carbohydrate,
+  }
+  const result: Nutrition = {}
+  let any = false
+  for (const { key } of NUTRITION_FIELDS) {
+    const v = asNumber(aliased[key], NaN)
+    if (isFinite(v) && v > 0) {
+      result[key] = Math.round(v * 10) / 10
+      any = true
+    }
+  }
+  return any ? result : undefined
+}
+
 /** Coerce arbitrary parsed JSON into a well-formed Recipe with stable ids. */
 function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
   if (typeof raw !== 'object' || raw === null) {
@@ -118,17 +140,22 @@ function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
     throw new RecipeExtractionError("Couldn't find any recipe content.")
   }
 
+  const servingSize = String(r.servingSize ?? '').trim()
+  const nutrition = asNutrition(r.nutrition)
+
   return {
     id: uid('recipe'),
     title: String(r.title ?? '').trim() || 'Untitled Recipe',
     cuisine: String(r.cuisine ?? '').trim() || 'Other',
     protein,
     servings: Math.max(1, Math.round(asNumber(r.servings, 4))),
+    ...(servingSize ? { servingSize } : {}),
     cookTime: String(r.cookTime ?? '').trim() || '—',
     prepTime: String(r.prepTime ?? '').trim() || '—',
     ingredients,
     steps: steps.sort((a, b) => a.order - b.order),
     tags,
+    ...(nutrition ? { nutrition } : {}),
     sourceFile,
   }
 }

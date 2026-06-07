@@ -36,13 +36,18 @@ export function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () =>
           )}
         </div>
 
-        <div className="flex items-center gap-3 pt-1 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-slate-500">
           <span className="inline-flex items-center gap-1">
             <ClockIcon width={14} height={14} /> Prep {recipe.prepTime}
           </span>
           <span className="inline-flex items-center gap-1">
             <ClockIcon width={14} height={14} /> Cook {recipe.cookTime}
           </span>
+          {typeof recipe.nutrition?.calories === 'number' && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+              {recipe.nutrition.calories} cal
+            </span>
+          )}
         </div>
       </div>
     </button>

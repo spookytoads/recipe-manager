@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext'
 import { formatQuantity, proteinLabel } from '../../lib/util'
 import { CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
 import { Thumbnail } from './Thumbnail'
+import { hasNutrition, NutritionPanel } from './NutritionPanel'
 
 export function RecipeDetailModal({
   recipe,
@@ -93,6 +94,7 @@ export function RecipeDetailModal({
             </span>
             <span className="inline-flex items-center gap-1.5">
               <ChefIcon width={16} height={16} /> Serves {recipe.servings}
+              {recipe.servingSize ? ` · ${recipe.servingSize}` : ''}
             </span>
           </div>
 
@@ -115,6 +117,13 @@ export function RecipeDetailModal({
                 </span>
               ))}
             </div>
+          )}
+
+          {/* Nutrition (only when the recipe provides it) */}
+          {hasNutrition(recipe.nutrition) && (
+            <section className="mt-5">
+              <NutritionPanel nutrition={recipe.nutrition} />
+            </section>
           )}
 
           {/* Ingredients */}

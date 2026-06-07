@@ -4,6 +4,7 @@ import { formatQuantity, proteinLabel } from '../../lib/util'
 import { CheckIcon, ChefIcon, ChevronDownIcon, ClockIcon, CloseIcon, JournalIcon } from '../ui/icons'
 import { Timer } from './Timer'
 import { CookLogModal } from '../journal/CookLogModal'
+import { hasNutrition, NutritionPanel } from '../repository/NutritionPanel'
 
 export function Cook() {
   const {
@@ -243,6 +244,13 @@ export function Cook() {
           </ol>
         </section>
       </div>
+
+      {/* Per-serving nutrition (only when the recipe provides it) */}
+      {hasNutrition(recipe.nutrition) && (
+        <section className="card mt-4 p-4 sm:p-5">
+          <NutritionPanel nutrition={recipe.nutrition} servings={recipe.servings} multiplier={servings} />
+        </section>
+      )}
 
       {showLogModal && (
         <CookLogModal recipe={recipe} onClose={() => setShowLogModal(false)} />
