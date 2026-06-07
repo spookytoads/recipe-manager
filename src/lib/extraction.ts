@@ -2,23 +2,32 @@ import type { Category, Ingredient, Recipe, Step } from '../types'
 import { CATEGORIES } from '../types'
 import { uid } from './util'
 
-const API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-4-20250514'
+// Google Gemini — free tier reads PDFs (up to 1000 pages) and returns JSON.
+// gemini-2.5-flash is the current stable free-tier model (10 req/min, 250/day).
+const GEMINI_MODEL = 'gemini-2.5-flash'
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
-// The Anthropic API accepts at most 100 pages per request. We split larger
-// PDFs into sections of this size so arbitrarily long cookbooks work, and so a
-// single request's output isn't truncated by the token ceiling. Kept small
-// because dense cookbooks run ~1 recipe per page — 10 pages ≈ 10 recipes per
-// request, which stays comfortably under the output-token budget below.
+// We still split long PDFs into sections of this size — not because of an input
+// page limit (Gemini allows 1000), but so a single request's JSON output stays
+// under the token ceiling. Dense cookbooks run ~1 recipe per page, so 10 pages
+// ≈ 10 recipes per request.
 const CHUNK_PAGES = 10
 
 // Output ceiling per request. 10 recipes' worth of JSON is well under this.
 const MAX_TOKENS = 24000
 
 const SYSTEM_PROMPT =
-  'You are a recipe extraction assistant. A PDF may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category }], steps: [{ id, order, instruction, timerSeconds }], tags[] }. If the document contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other.'
+  'You are a recipe extraction assistant. The input (a PDF or pasted text) may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category }], steps: [{ id, order, instruction, timerSeconds }], tags[] }. If the input contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other.'
 
 export class RecipeExtractionError extends Error {}
+
+export interface ExtractionResult {
+  recipes: Recipe[]
+  /** Total number of sections the PDF was split into. */
+  sections: number
+  /** How many sections failed to extract (e.g. truncated/garbled output). */
+  failedSections: number
+}
 
 /** Encode raw bytes as a base64 string (without any data: URL prefix). */
 function bytesToBase64(bytes: Uint8Array): string {
@@ -106,7 +115,7 @@ function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
   const tags = Array.isArray(r.tags) ? r.tags.map((t) => String(t).trim()).filter(Boolean) : []
 
   if (!ingredients.length && !steps.length) {
-    throw new RecipeExtractionError("Couldn't find any recipe content in that PDF.")
+    throw new RecipeExtractionError("Couldn't find any recipe content.")
   }
 
   return {
@@ -124,44 +133,57 @@ function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
   }
 }
 
-/** Send one base64 PDF (≤100 pages) to the API and return its recipes. */
-async function extractFromBase64(base64: string, apiKey: string, sourceFile: string): Promise<Recipe[]> {
+/** Parse a model JSON response into normalized recipes, skipping malformed entries. */
+function parseRecipes(text: string, sourceFile: string): Recipe[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(extractJson(text))
+  } catch {
+    throw new RecipeExtractionError("Couldn't parse the recipe JSON from the model's response.")
+  }
+  const recipes: Recipe[] = []
+  for (const item of toRecipeList(parsed)) {
+    try {
+      recipes.push(normalizeRecipe(item, sourceFile))
+    } catch {
+      /* skip this entry */
+    }
+  }
+  return recipes
+}
+
+function getApiKey(): string {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+  if (!apiKey) {
+    throw new RecipeExtractionError(
+      'No API key configured. Set VITE_GEMINI_API_KEY (get a free key at aistudio.google.com).'
+    )
+  }
+  return apiKey
+}
+
+/** Call Gemini with the given content parts and return its raw text response. */
+async function callGemini(parts: unknown[], apiKey: string): Promise<string> {
   let response: Response
   try {
-    response = await fetch(API_URL, {
+    response = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        // Required to call the API directly from a browser.
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL,
-        // Generous ceiling so multi-recipe (cookbook) sections aren't truncated.
-        max_tokens: MAX_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'document',
-                source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-              },
-              {
-                type: 'text',
-                text: 'Extract every recipe in this PDF as JSON, following the system instructions exactly. Return { "recipes": [...] }.',
-              },
-            ],
-          },
-        ],
+        contents: [{ parts }],
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          maxOutputTokens: MAX_TOKENS,
+          temperature: 0,
+          // Disable "thinking" so it doesn't consume the output budget on extraction.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     })
   } catch {
     throw new RecipeExtractionError(
-      'Network error contacting the Anthropic API. Check your connection and try again.'
+      'Network error contacting the Gemini API. Check your connection and try again.'
     )
   }
 
@@ -173,41 +195,54 @@ async function extractFromBase64(base64: string, apiKey: string, sourceFile: str
     } catch {
       /* ignore parse errors */
     }
-    if (response.status === 401) {
-      throw new RecipeExtractionError('API key was rejected (401). Double-check your key.')
+    if (response.status === 400 && /api key not valid/i.test(detail)) {
+      throw new RecipeExtractionError('API key was rejected. Double-check your Gemini key.')
+    }
+    if (response.status === 403) {
+      throw new RecipeExtractionError('Access denied (403). Check that your Gemini key is valid and enabled.')
     }
     if (response.status === 429) {
-      throw new RecipeExtractionError('Rate limited (429). Wait a moment and retry.')
+      throw new RecipeExtractionError(
+        'Rate limited (429) — the free tier allows a limited number of requests per minute/day. Wait a moment and retry.'
+      )
     }
-    throw new RecipeExtractionError(`Anthropic API error (${response.status})${detail}`)
+    throw new RecipeExtractionError(`Gemini API error (${response.status})${detail}`)
   }
 
   const data = await response.json()
+
+  const blockReason = data?.promptFeedback?.blockReason
+  if (blockReason) {
+    throw new RecipeExtractionError(`The request was blocked by the API (${blockReason}).`)
+  }
+
+  const candidate = data?.candidates?.[0]
   const text: string =
-    data?.content?.map((block: { text?: string }) => block.text ?? '').join('') ?? ''
+    candidate?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? ''
 
   if (!text.trim()) {
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      throw new RecipeExtractionError(
+        'The response was cut off — too many recipes in one section. Try a smaller PDF.'
+      )
+    }
     throw new RecipeExtractionError('The model returned an empty response.')
   }
+  return text
+}
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(extractJson(text))
-  } catch {
-    throw new RecipeExtractionError("Couldn't parse the recipe JSON from the model's response.")
-  }
-
-  // Normalize each recipe, skipping any malformed/empty entries rather than
-  // failing the whole batch on one bad recipe in a long document.
-  const recipes: Recipe[] = []
-  for (const item of toRecipeList(parsed)) {
-    try {
-      recipes.push(normalizeRecipe(item, sourceFile))
-    } catch {
-      /* skip this entry */
-    }
-  }
-  return recipes
+/** Send one base64 PDF section to Gemini and return its recipes. */
+async function extractFromBase64(base64: string, apiKey: string, sourceFile: string): Promise<Recipe[]> {
+  const text = await callGemini(
+    [
+      { inline_data: { mime_type: 'application/pdf', data: base64 } },
+      {
+        text: 'Extract every recipe in this PDF as JSON, following the system instructions exactly. Return { "recipes": [...] }.',
+      },
+    ],
+    apiKey
+  )
+  return parseRecipes(text, sourceFile)
 }
 
 /** Split a PDF's bytes into base64-encoded sections of at most CHUNK_PAGES pages. */
@@ -248,20 +283,11 @@ function dedupeByTitle(recipes: Recipe[]): Recipe[] {
   return [...byKey.values()]
 }
 
-export interface ExtractionResult {
-  recipes: Recipe[]
-  /** Total number of sections the PDF was split into. */
-  sections: number
-  /** How many sections failed to extract (e.g. truncated/garbled output). */
-  failedSections: number
-}
-
 /**
- * Send a PDF to the Anthropic API and return every recipe found in it.
- * Long PDFs (more than {@link CHUNK_PAGES} pages, including ones over the API's
- * 100-page-per-request limit) are split into sections, extracted, and merged.
- * A single failing section is skipped rather than aborting the whole import, so
- * a 100-recipe cookbook doesn't fail because one page didn't parse.
+ * Send a PDF to the Gemini API and return every recipe found in it.
+ * Long PDFs are split into sections, extracted, and merged. A single failing
+ * section is skipped rather than aborting the whole import, so a 100-recipe
+ * cookbook doesn't fail because one page didn't parse.
  * `onProgress` receives human-readable status updates for multi-section files.
  * Throws RecipeExtractionError only when nothing could be extracted at all.
  */
@@ -269,13 +295,7 @@ export async function extractRecipesFromPdf(
   file: File,
   onProgress?: (message: string) => void
 ): Promise<ExtractionResult> {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new RecipeExtractionError(
-      'No API key configured. Set VITE_ANTHROPIC_API_KEY in your environment.'
-    )
-  }
-
+  const apiKey = getApiKey()
   const buffer = await file.arrayBuffer()
 
   let sections: string[]
@@ -313,4 +333,29 @@ export async function extractRecipesFromPdf(
     throw new RecipeExtractionError("Couldn't find any recipes in that PDF.")
   }
   return { recipes: merged, sections: sections.length, failedSections }
+}
+
+/**
+ * Parse pasted recipe text into structured recipes via Gemini (no PDF needed).
+ * Powers the "paste & parse" path in the manual Add Recipe form.
+ */
+export async function extractRecipesFromText(rawText: string): Promise<ExtractionResult> {
+  const apiKey = getApiKey()
+  const trimmed = rawText.trim()
+  if (!trimmed) {
+    throw new RecipeExtractionError('Paste some recipe text first.')
+  }
+  const text = await callGemini(
+    [
+      {
+        text: `Extract every recipe from the following text as JSON, following the system instructions exactly. Return { "recipes": [...] }.\n\n---\n${trimmed}`,
+      },
+    ],
+    apiKey
+  )
+  const recipes = dedupeByTitle(parseRecipes(text, 'pasted-text'))
+  if (recipes.length === 0) {
+    throw new RecipeExtractionError("Couldn't find a recipe in that text.")
+  }
+  return { recipes, sections: 1, failedSections: 0 }
 }

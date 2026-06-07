@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { PROTEIN_FILTERS, type ProteinFilter, type Recipe } from '../../types'
 import { matchesProtein, matchesSearch } from '../../lib/util'
-import { BookIcon, SearchIcon, UploadIcon } from '../ui/icons'
+import { BookIcon, PlusIcon, SearchIcon, UploadIcon } from '../ui/icons'
 import { RecipeCard, RecipeCardSkeleton } from './RecipeCard'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { PdfUpload } from './PdfUpload'
+import { AddRecipeModal } from './AddRecipeModal'
 
 export function Repository() {
   const { recipes } = useApp()
@@ -13,6 +14,7 @@ export function Repository() {
   const [filter, setFilter] = useState<ProteinFilter>('All')
   const [selected, setSelected] = useState<Recipe | null>(null)
   const [extracting, setExtracting] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   const filtered = useMemo(
     () =>
@@ -34,7 +36,12 @@ export function Repository() {
             {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
           </p>
         </div>
-        <PdfUpload onExtractingChange={setExtracting} />
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
+          <button onClick={() => setAdding(true)} className="btn-secondary">
+            <PlusIcon width={18} height={18} /> Add manually
+          </button>
+          <PdfUpload onExtractingChange={setExtracting} />
+        </div>
       </div>
 
       {/* Search */}
@@ -77,7 +84,7 @@ export function Repository() {
       {extracting && !hasRecipes ? (
         <SkeletonGrid />
       ) : !hasRecipes ? (
-        <EmptyLibrary />
+        <EmptyLibrary onAdd={() => setAdding(true)} />
       ) : filtered.length === 0 ? (
         <NoMatches onReset={() => { setQuery(''); setFilter('All') }} />
       ) : (
@@ -92,6 +99,8 @@ export function Repository() {
       {selected && (
         <RecipeDetailModal recipe={selected} onClose={() => setSelected(null)} />
       )}
+
+      {adding && <AddRecipeModal onClose={() => setAdding(false)} />}
     </div>
   )
 }
@@ -106,7 +115,7 @@ function SkeletonGrid() {
   )
 }
 
-function EmptyLibrary() {
+function EmptyLibrary({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center">
       <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-herb-50 text-herb-500">
@@ -114,11 +123,16 @@ function EmptyLibrary() {
       </span>
       <h2 className="text-lg font-bold text-slate-800">No recipes yet</h2>
       <p className="mt-1 max-w-xs text-sm text-slate-500">
-        Upload a recipe PDF to get started — we'll extract the ingredients and steps for you.
+        Upload a recipe PDF and we'll extract it for you — or add one by hand.
       </p>
-      <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-herb-600">
-        <UploadIcon width={16} height={16} /> Use the “Upload PDF” button above
-      </p>
+      <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row">
+        <button onClick={onAdd} className="btn-secondary">
+          <PlusIcon width={16} height={16} /> Add manually
+        </button>
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-herb-600">
+          <UploadIcon width={16} height={16} /> or use “Upload PDF” above
+        </span>
+      </div>
     </div>
   )
 }

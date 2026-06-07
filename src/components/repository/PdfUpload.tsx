@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { extractRecipesFromPdf, RecipeExtractionError } from '../../lib/anthropic'
+import { extractRecipesFromPdf, RecipeExtractionError } from '../../lib/extraction'
 import { AlertIcon, ResetIcon, UploadIcon } from '../ui/icons'
 import { Spinner } from '../ui/Spinner'
 
