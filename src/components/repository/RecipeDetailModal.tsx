@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { Recipe } from '../../types'
 import { useApp } from '../../context/AppContext'
-import { formatMeasure, proteinLabel } from '../../lib/util'
-import { CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
+import { formatDate, formatMeasure, proteinLabel } from '../../lib/util'
+import { CalendarIcon, CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
 import { Thumbnail } from './Thumbnail'
 import { hasNutrition, NutritionPanel } from './NutritionPanel'
+import { StarRating } from '../journal/StarRating'
 
 export function RecipeDetailModal({
   recipe,
@@ -13,7 +14,17 @@ export function RecipeDetailModal({
   recipe: Recipe
   onClose: () => void
 }) {
-  const { addRecipeToShopping, addToCookQueue, startCooking, pushToast, deleteRecipe } = useApp()
+  const { addRecipeToShopping, addToCookQueue, startCooking, pushToast, deleteRecipe, cookLog } =
+    useApp()
+
+  // Past cooks of this recipe, newest first, for the rating summary + reviews.
+  const reviews = useMemo(
+    () => cookLog.filter((e) => e.recipeId === recipe.id).sort((a, b) => b.dateCooked.localeCompare(a.dateCooked)),
+    [cookLog, recipe.id]
+  )
+  const rated = reviews.filter((e) => e.rating > 0)
+  const avgRating = rated.length ? rated.reduce((s, e) => s + e.rating, 0) / rated.length : 0
+  const withNotes = reviews.filter((e) => e.notes.trim() || e.rating > 0)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -84,6 +95,22 @@ export function RecipeDetailModal({
           <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-slate-800">
             {recipe.title}
           </h2>
+
+          {reviews.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {avgRating > 0 && (
+                <>
+                  <StarRating value={Math.round(avgRating)} size={18} />
+                  <span className="text-sm font-bold text-slate-700">{avgRating.toFixed(1)}</span>
+                </>
+              )}
+              <span className="text-sm text-slate-500">
+                {avgRating > 0 ? '·' : ''} Cooked {reviews.length}{' '}
+                {reviews.length === 1 ? 'time' : 'times'}
+                {avgRating === 0 ? ' · not rated yet' : ''}
+              </span>
+            </div>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1.5">
@@ -157,6 +184,36 @@ export function RecipeDetailModal({
               ))}
             </ol>
           </section>
+
+          {/* Past reviews from the cooking journal */}
+          {withNotes.length > 0 && (
+            <section className="mt-6">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+                Reviews
+              </h3>
+              <ul className="space-y-2">
+                {withNotes.map((entry) => (
+                  <li key={entry.id} className="rounded-xl border border-slate-200/70 bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      {entry.rating > 0 ? (
+                        <StarRating value={entry.rating} size={16} />
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400">Not rated</span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                        <CalendarIcon width={13} height={13} /> {formatDate(entry.dateCooked)}
+                      </span>
+                    </div>
+                    {entry.notes.trim() && (
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+                        {entry.notes}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <button
             onClick={handleDelete}
