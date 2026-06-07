@@ -1,0 +1,17 @@
+{
+  "name": "Recipe Manager",
+  "short_name": "Recipes",
+  "description": "Browse, shop, and cook your recipes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf8f4",
+  "theme_color": "#3d8540",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

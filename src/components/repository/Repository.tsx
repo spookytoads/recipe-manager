@@ -1,0 +1,139 @@
+import { useMemo, useState } from 'react'
+import { useApp } from '../../context/AppContext'
+import { PROTEIN_FILTERS, type ProteinFilter, type Recipe } from '../../types'
+import { matchesProtein, matchesSearch } from '../../lib/util'
+import { BookIcon, SearchIcon, UploadIcon } from '../ui/icons'
+import { RecipeCard, RecipeCardSkeleton } from './RecipeCard'
+import { RecipeDetailModal } from './RecipeDetailModal'
+import { PdfUpload } from './PdfUpload'
+
+export function Repository() {
+  const { recipes } = useApp()
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<ProteinFilter>('All')
+  const [selected, setSelected] = useState<Recipe | null>(null)
+  const [extracting, setExtracting] = useState(false)
+
+  const filtered = useMemo(
+    () =>
+      recipes.filter((r) => matchesSearch(r, query) && matchesProtein(r, filter)),
+    [recipes, query, filter]
+  )
+
+  const hasRecipes = recipes.length > 0
+
+  return (
+    <div className="mx-auto max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
+      {/* Header row */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 sm:text-3xl">
+            Recipe Repository
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
+          </p>
+        </div>
+        <PdfUpload onExtractingChange={setExtracting} />
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <SearchIcon
+          width={18}
+          height={18}
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+        />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by title, tag, or cuisine…"
+          className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-herb-400 focus:ring-2 focus:ring-herb-100"
+        />
+      </div>
+
+      {/* Filter chips */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {PROTEIN_FILTERS.map((f) => {
+          const active = filter === f
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`chip ${
+                active
+                  ? 'border-herb-500 bg-herb-500 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-herb-300 hover:text-herb-700'
+              }`}
+            >
+              {f}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Grid / states */}
+      {extracting && !hasRecipes ? (
+        <SkeletonGrid />
+      ) : !hasRecipes ? (
+        <EmptyLibrary />
+      ) : filtered.length === 0 ? (
+        <NoMatches onReset={() => { setQuery(''); setFilter('All') }} />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {extracting && <RecipeCardSkeleton />}
+          {filtered.map((r) => (
+            <RecipeCard key={r.id} recipe={r} onClick={() => setSelected(r)} />
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <RecipeDetailModal recipe={selected} onClose={() => setSelected(null)} />
+      )}
+    </div>
+  )
+}
+
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <RecipeCardSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
+function EmptyLibrary() {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center">
+      <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-herb-50 text-herb-500">
+        <BookIcon width={32} height={32} />
+      </span>
+      <h2 className="text-lg font-bold text-slate-800">No recipes yet</h2>
+      <p className="mt-1 max-w-xs text-sm text-slate-500">
+        Upload a recipe PDF to get started — we'll extract the ingredients and steps for you.
+      </p>
+      <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-herb-600">
+        <UploadIcon width={16} height={16} /> Use the “Upload PDF” button above
+      </p>
+    </div>
+  )
+}
+
+function NoMatches({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center">
+      <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+        <SearchIcon width={32} height={32} />
+      </span>
+      <h2 className="text-lg font-bold text-slate-800">No matching recipes</h2>
+      <p className="mt-1 text-sm text-slate-500">Try a different search or filter.</p>
+      <button onClick={onReset} className="btn-secondary mt-4">
+        Clear filters
+      </button>
+    </div>
+  )
+}
