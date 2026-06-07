@@ -157,3 +157,16 @@ export const EditIcon = (p: IconProps) => (
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 )
+
+export const UserIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+)
+
+export const CloudIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+  </svg>
+)

@@ -1,7 +1,8 @@
 import { useApp, type Section } from '../context/AppContext'
 import { aggregateKey } from '../context/AppContext'
-import { BookIcon, CartIcon, ChefIcon, JournalIcon } from './ui/icons'
-import { useMemo } from 'react'
+import { BookIcon, CartIcon, ChefIcon, JournalIcon, UserIcon } from './ui/icons'
+import { useMemo, useState } from 'react'
+import { AuthModal } from './AuthModal'
 
 const NAV: { id: Section; label: string; Icon: typeof BookIcon }[] = [
   { id: 'repository', label: 'Repository', Icon: BookIcon },
@@ -11,7 +12,9 @@ const NAV: { id: Section; label: string; Icon: typeof BookIcon }[] = [
 ]
 
 export function NavBar() {
-  const { section, setSection, shopping, checkedKeys, cookQueue } = useApp()
+  const { section, setSection, shopping, checkedKeys, cookQueue, cloudEnabled, user, syncStatus } =
+    useApp()
+  const [authOpen, setAuthOpen] = useState(false)
 
   const shoppingRemaining = useMemo(() => {
     const keys = new Set(shopping.map((e) => aggregateKey(e.name, e.unit, e.category)))
@@ -76,7 +79,27 @@ export function NavBar() {
             )
           })}
         </nav>
+
+        {cloudEnabled && (
+          <button
+            onClick={() => setAuthOpen(true)}
+            className="tap-target relative flex shrink-0 items-center justify-center rounded-xl px-2 text-slate-600 hover:bg-slate-100"
+            aria-label={user ? 'Account' : 'Sign in to sync'}
+            title={user ? `Signed in as ${user.email}` : 'Sign in to sync'}
+          >
+            <UserIcon width={20} height={20} />
+            {user && (
+              <span
+                className={`absolute right-1 top-1.5 h-2 w-2 rounded-full ${
+                  syncStatus === 'error' ? 'bg-red-500' : 'bg-herb-500'
+                }`}
+              />
+            )}
+          </button>
+        )}
       </div>
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </header>
   )
 }

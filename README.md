@@ -82,11 +82,28 @@ For a hardened public deployment, move the API call behind a serverless function
 2. Point `src/lib/extraction.ts` at `/api/extract` instead of `https://generativelanguage.googleapis.com/...` and drop the key from the URL.
 3. Set `GEMINI_API_KEY` (server-only) in Vercel instead of `VITE_GEMINI_API_KEY`.
 
+## Cloud sync (optional, free) — sign in to sync across devices
+
+By default the app stores everything in your browser's `localStorage` (per-device). Enable optional **cloud sync** so your recipes, shopping list, and cooking journal follow you to any device you sign in to. It's built on [Supabase](https://supabase.com)'s free tier. If you skip this, the app simply runs local-only and the account button doesn't appear.
+
+**One-time setup:**
+
+1. Create a free project at [supabase.com](https://supabase.com) → **New project** (pick any name/password; remember the region).
+2. In the project, open **SQL Editor → New query**, paste the contents of [`supabase-schema.sql`](supabase-schema.sql), and click **Run**. (Creates one `app_state` table with row-level security so each user only sees their own data.)
+3. *(Recommended for instant signups)* **Authentication → Sign In / Providers → Email** → turn **off** "Confirm email" so creating an account logs you straight in. (Leave it on if you prefer email verification.)
+4. Open **Project Settings → API** and copy two values:
+   - **Project URL** → `VITE_SUPABASE_URL`
+   - **anon / public key** → `VITE_SUPABASE_ANON_KEY` (this key is safe to expose publicly — row-level security protects the data)
+5. Add both as environment variables — in `.env.local` for local dev, and in **Vercel → Settings → Environment Variables** for the live site — then **redeploy** (Vercel only rebuilds with new env vars on a fresh deploy).
+
+Once set, an account icon appears in the top-right. Create an account, and your data is saved to the cloud and restored on any device you sign in to. (Sync uses last-write-wins; editing on two devices at the exact same time can overwrite — fine for normal single-user use.)
+
 ## Tech stack
 
 - [Vite](https://vitejs.dev/) + [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Google Gemini API](https://ai.google.dev/) (free tier) for PDF & text recipe extraction
+- [Supabase](https://supabase.com/) (free tier) for optional accounts + cross-device cloud sync
 - `localStorage` + a service worker for persistence and offline support
 
 ## Project structure

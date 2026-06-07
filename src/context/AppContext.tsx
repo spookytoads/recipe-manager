@@ -12,6 +12,20 @@ import type { CookLogEntry, CookProgress, Recipe, ShoppingEntry } from '../types
 import { KEYS, load, save } from '../data/storage'
 import { SEED_RECIPES } from '../data/seed'
 import { uid } from '../lib/util'
+import {
+  fetchCloudState,
+  isSupabaseConfigured,
+  saveCloudState,
+  supabase,
+  type SyncState,
+} from '../lib/supabase'
+
+export type SyncStatus = 'off' | 'signed-out' | 'syncing' | 'synced' | 'error'
+
+export interface CloudUser {
+  id: string
+  email: string
+}
 
 export type Section = 'repository' | 'shopping' | 'cook' | 'journal'
 
@@ -58,6 +72,14 @@ interface AppContextValue {
   addCookLog: (entry: Omit<CookLogEntry, 'id'>) => CookLogEntry
   updateCookLog: (id: string, patch: Partial<Omit<CookLogEntry, 'id'>>) => void
   deleteCookLog: (id: string) => void
+
+  // Cloud sync
+  cloudEnabled: boolean
+  user: CloudUser | null
+  syncStatus: SyncStatus
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
+  signOut: () => Promise<void>
 
   // Toasts
   toasts: Toast[]
@@ -109,6 +131,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     load<CookLogEntry[]>(KEYS.cookLog, [])
   )
 
+  // --- Cloud sync ---
+  const [user, setUser] = useState<CloudUser | null>(null)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(
+    isSupabaseConfigured ? 'signed-out' : 'off'
+  )
+  const hydratingRef = useRef(false)
+  const saveTimer = useRef<number | null>(null)
+
   // --- Toasts ---
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastTimers = useRef<Record<string, number>>({})
@@ -121,6 +151,126 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(KEYS.cookQueue, cookQueue), [cookQueue])
   useEffect(() => save(KEYS.cookProgress, cookProgress), [cookProgress])
   useEffect(() => save(KEYS.cookLog, cookLog), [cookLog])
+
+  // --- Cloud sync ---
+  // Keep a always-fresh snapshot so login can push the current local state up.
+  const stateRef = useRef<SyncState>({
+    recipes,
+    shopping,
+    checked: checkedKeys,
+    multiplier,
+    cookQueue,
+    cookProgress,
+    cookLog,
+  })
+  useEffect(() => {
+    stateRef.current = {
+      recipes,
+      shopping,
+      checked: checkedKeys,
+      multiplier,
+      cookQueue,
+      cookProgress,
+      cookLog,
+    }
+  })
+
+  // Replace all local state with a state pulled from the cloud.
+  const applyState = useCallback((s: SyncState) => {
+    hydratingRef.current = true
+    setRecipes(s.recipes ?? [])
+    setShopping(s.shopping ?? [])
+    setCheckedKeys(s.checked ?? [])
+    setMultiplierState(s.multiplier ?? 1)
+    setCookQueue(s.cookQueue ?? [])
+    setActiveCookId((s.cookQueue ?? [])[0] ?? null)
+    setCookProgress(s.cookProgress ?? {})
+    setCookLog(s.cookLog ?? [])
+    // Let the immediate post-hydrate save effect skip, then re-enable saving.
+    window.setTimeout(() => {
+      hydratingRef.current = false
+    }, 0)
+  }, [])
+
+  const handleUser = useCallback(
+    async (u: { id: string; email?: string | null } | null) => {
+      if (!u) {
+        setUser(null)
+        setSyncStatus(isSupabaseConfigured ? 'signed-out' : 'off')
+        return
+      }
+      setUser({ id: u.id, email: u.email ?? '' })
+      setSyncStatus('syncing')
+      try {
+        const remote = await fetchCloudState(u.id)
+        if (remote) {
+          // This account has cloud data — adopt it.
+          applyState(remote)
+        } else {
+          // First login for this account — seed the cloud from current local data.
+          await saveCloudState(u.id, stateRef.current)
+        }
+        setSyncStatus('synced')
+      } catch {
+        setSyncStatus('error')
+      }
+    },
+    [applyState]
+  )
+
+  // Initialize auth: pick up an existing session and watch for changes.
+  useEffect(() => {
+    if (!supabase) return
+    let active = true
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) void handleUser(data.session?.user ?? null)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      void handleUser(session?.user ?? null)
+    })
+    return () => {
+      active = false
+      sub.subscription.unsubscribe()
+    }
+  }, [handleUser])
+
+  // Push local changes up (debounced) whenever signed in.
+  useEffect(() => {
+    if (!supabase || !user || hydratingRef.current) return
+    if (saveTimer.current) window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(() => {
+      setSyncStatus('syncing')
+      saveCloudState(user.id, {
+        recipes,
+        shopping,
+        checked: checkedKeys,
+        multiplier,
+        cookQueue,
+        cookProgress,
+        cookLog,
+      })
+        .then(() => setSyncStatus('synced'))
+        .catch(() => setSyncStatus('error'))
+    }, 1200)
+  }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog])
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    if (!supabase) throw new Error('Cloud sync is not configured.')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }, [])
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    if (!supabase) throw new Error('Cloud sync is not configured.')
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) throw error
+    return { needsConfirmation: !data.session }
+  }, [])
+
+  const signOut = useCallback(async () => {
+    if (!supabase) return
+    await supabase.auth.signOut()
+  }, [])
 
   // --- Toast helpers ---
   const dismissToast = useCallback((id: string) => {
@@ -294,6 +444,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCookLog,
       updateCookLog,
       deleteCookLog,
+      cloudEnabled: isSupabaseConfigured,
+      user,
+      syncStatus,
+      signIn,
+      signUp,
+      signOut,
       toasts,
       pushToast,
       dismissToast,
@@ -324,6 +480,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCookLog,
       updateCookLog,
       deleteCookLog,
+      user,
+      syncStatus,
+      signIn,
+      signUp,
+      signOut,
       toasts,
       pushToast,
       dismissToast,
