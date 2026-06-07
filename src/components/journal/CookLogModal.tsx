@@ -41,16 +41,17 @@ export function CookLogModal({ recipe, onClose }: { recipe: Recipe; onClose: () 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 animate-fade-in overflow-y-auto bg-slate-900/50 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={`Log ${recipe.title}`}
     >
-      <div
-        className="w-full max-w-md animate-slide-up rounded-t-3xl bg-cream p-5 shadow-2xl sm:rounded-3xl sm:p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          className="w-full max-w-md animate-slide-up rounded-3xl bg-cream p-5 shadow-2xl sm:p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-herb-100 text-herb-600">
@@ -106,6 +107,7 @@ export function CookLogModal({ recipe, onClose }: { recipe: Recipe; onClose: () 
           <button onClick={handleSave} className="btn-primary">
             Save to journal
           </button>
+        </div>
         </div>
       </div>
     </div>
