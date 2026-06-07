@@ -18,10 +18,14 @@ export function RecipeDetailModal({
     useApp()
 
   // Past cooks of this recipe, newest first, for the rating summary + reviews.
-  const reviews = useMemo(
-    () => cookLog.filter((e) => e.recipeId === recipe.id).sort((a, b) => b.dateCooked.localeCompare(a.dateCooked)),
-    [cookLog, recipe.id]
-  )
+  // Match by recipe TITLE (case-insensitive) so reviews survive re-uploading a
+  // recipe (which gives it a new id) — also accept an exact id match.
+  const reviews = useMemo(() => {
+    const title = recipe.title.trim().toLowerCase()
+    return cookLog
+      .filter((e) => e.recipeId === recipe.id || e.recipeTitle.trim().toLowerCase() === title)
+      .sort((a, b) => b.dateCooked.localeCompare(a.dateCooked))
+  }, [cookLog, recipe.id, recipe.title])
   const rated = reviews.filter((e) => e.rating > 0)
   const avgRating = rated.length ? rated.reduce((s, e) => s + e.rating, 0) / rated.length : 0
   const withNotes = reviews.filter((e) => e.notes.trim() || e.rating > 0)
