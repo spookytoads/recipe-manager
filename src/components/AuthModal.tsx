@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useApp } from '../context/AppContext'
 import { AlertIcon, CheckIcon, CloseIcon, CloudIcon } from './ui/icons'
 import { Spinner } from './ui/Spinner'
@@ -63,7 +64,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 animate-fade-in overflow-y-auto bg-slate-900/50 backdrop-blur-sm"
       onClick={onClose}
@@ -178,7 +179,8 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
