@@ -11,6 +11,8 @@ interface IngRow {
   name: string
   quantity: string
   unit: string
+  altQuantity: string
+  altUnit: string
   category: Category
 }
 
@@ -20,7 +22,15 @@ interface StepRow {
   minutes: string
 }
 
-const emptyIng = (): IngRow => ({ key: uid('row'), name: '', quantity: '', unit: '', category: 'Other' })
+const emptyIng = (): IngRow => ({
+  key: uid('row'),
+  name: '',
+  quantity: '',
+  unit: '',
+  altQuantity: '',
+  altUnit: '',
+  category: 'Other',
+})
 const emptyStep = (): StepRow => ({ key: uid('row'), instruction: '', minutes: '' })
 
 const inputClass =
@@ -89,6 +99,8 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
             name: i.name,
             quantity: i.quantity ? String(i.quantity) : '',
             unit: i.unit,
+            altQuantity: typeof i.altQuantity === 'number' ? String(i.altQuantity) : '',
+            altUnit: i.altUnit ?? '',
             category: i.category,
           }))
         : [emptyIng()]
@@ -152,13 +164,18 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
       prepTime: prepTime.trim() || '—',
       ingredients: ingredients
         .filter((i) => i.name.trim())
-        .map((i) => ({
-          id: uid('ing'),
-          name: i.name.trim(),
-          quantity: Number(i.quantity) || 0,
-          unit: i.unit.trim(),
-          category: i.category,
-        })),
+        .map((i) => {
+          const altQ = Number(i.altQuantity)
+          const hasAlt = i.altQuantity.trim() !== '' && isFinite(altQ) && altQ > 0 && i.altUnit.trim() !== ''
+          return {
+            id: uid('ing'),
+            name: i.name.trim(),
+            quantity: Number(i.quantity) || 0,
+            unit: i.unit.trim(),
+            category: i.category,
+            ...(hasAlt ? { altQuantity: altQ, altUnit: i.altUnit.trim() } : {}),
+          }
+        }),
       steps: steps
         .filter((s) => s.instruction.trim())
         .map((s, idx) => {
@@ -318,17 +335,20 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
 
           {/* Ingredients */}
           <section>
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">Ingredients</h3>
+            <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">Ingredients</h3>
+            <p className="mb-2 text-xs text-slate-400">
+              Optional 2nd measurement (e.g. grams) goes in the last “+ qty / + unit” boxes.
+            </p>
             <div className="space-y-2">
               {ingredients.map((row, idx) => (
-                <div key={row.key} className="flex items-center gap-2">
+                <div key={row.key} className="flex flex-wrap items-center gap-2">
                   <input
                     value={row.name}
                     onChange={(e) =>
                       setIngredients((prev) => prev.map((r) => (r.key === row.key ? { ...r, name: e.target.value } : r)))
                     }
                     placeholder="Ingredient"
-                    className={`${inputClass} flex-1`}
+                    className={`${inputClass} min-w-[130px] flex-1`}
                   />
                   <input
                     value={row.quantity}
@@ -344,6 +364,24 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
                       setIngredients((prev) => prev.map((r) => (r.key === row.key ? { ...r, unit: e.target.value } : r)))
                     }
                     placeholder="Unit"
+                    className={`${inputClass} w-20`}
+                  />
+                  <input
+                    value={row.altQuantity}
+                    onChange={(e) =>
+                      setIngredients((prev) => prev.map((r) => (r.key === row.key ? { ...r, altQuantity: e.target.value } : r)))
+                    }
+                    placeholder="+ qty"
+                    title="Optional second measurement amount"
+                    className={`${inputClass} w-16 text-center`}
+                  />
+                  <input
+                    value={row.altUnit}
+                    onChange={(e) =>
+                      setIngredients((prev) => prev.map((r) => (r.key === row.key ? { ...r, altUnit: e.target.value } : r)))
+                    }
+                    placeholder="+ unit"
+                    title="Optional second measurement unit (e.g. g)"
                     className={`${inputClass} w-20`}
                   />
                   <select

@@ -23,6 +23,9 @@ export interface Ingredient {
   quantity: number
   unit: string
   category: Category
+  /** Optional second measurement the recipe lists, e.g. "200 g (1 cup)" → alt = 1 cup. */
+  altQuantity?: number
+  altUnit?: string
 }
 
 export interface Step {
@@ -82,6 +85,8 @@ export interface ShoppingEntry {
   quantity: number
   unit: string
   category: Category
+  altQuantity?: number
+  altUnit?: string
   recipeId: string
   recipeTitle: string
 }

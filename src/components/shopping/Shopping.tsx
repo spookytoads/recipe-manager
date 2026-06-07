@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { aggregateKey, useApp } from '../../context/AppContext'
 import { CATEGORIES, type Category } from '../../types'
-import { formatQuantity } from '../../lib/util'
+import { formatMeasure } from '../../lib/util'
 import { CartIcon, CheckIcon, CloseIcon } from '../ui/icons'
 
 interface AggregatedItem {
@@ -10,6 +10,10 @@ interface AggregatedItem {
   unit: string
   category: Category
   quantity: number
+  /** Second measurement, only kept when every merged entry has the same alt unit. */
+  altUnit?: string
+  altQuantity?: number
+  altOk: boolean
   sources: string[]
 }
 
@@ -43,11 +47,20 @@ export function Shopping() {
     const map = new Map<string, AggregatedItem>()
     for (const entry of shopping) {
       const key = aggregateKey(entry.name, entry.unit, entry.category)
+      const entryHasAlt = typeof entry.altQuantity === 'number' && !!entry.altUnit
       const existing = map.get(key)
       if (existing) {
         existing.quantity += entry.quantity
         if (!existing.sources.includes(entry.recipeTitle)) {
           existing.sources.push(entry.recipeTitle)
+        }
+        // Keep the second measurement only if every merged entry agrees on its unit.
+        if (existing.altOk && entryHasAlt && entry.altUnit === existing.altUnit) {
+          existing.altQuantity = (existing.altQuantity ?? 0) + (entry.altQuantity ?? 0)
+        } else {
+          existing.altOk = false
+          existing.altUnit = undefined
+          existing.altQuantity = undefined
         }
       } else {
         map.set(key, {
@@ -56,6 +69,9 @@ export function Shopping() {
           unit: entry.unit,
           category: entry.category,
           quantity: entry.quantity,
+          altOk: entryHasAlt,
+          altUnit: entryHasAlt ? entry.altUnit : undefined,
+          altQuantity: entryHasAlt ? entry.altQuantity : undefined,
           sources: [entry.recipeTitle],
         })
       }
@@ -245,7 +261,13 @@ export function Shopping() {
                             checked ? 'text-slate-300' : 'text-slate-600'
                           }`}
                         >
-                          {formatQuantity(item.quantity * multiplier)} {item.unit}
+                          {formatMeasure(
+                            item.quantity,
+                            item.unit,
+                            item.altOk ? item.altQuantity : undefined,
+                            item.altOk ? item.altUnit : undefined,
+                            multiplier
+                          )}
                         </span>
                       </button>
                     </li>

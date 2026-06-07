@@ -165,6 +165,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         quantity: ing.quantity,
         unit: ing.unit,
         category: ing.category,
+        ...(typeof ing.altQuantity === 'number' && ing.altUnit
+          ? { altQuantity: ing.altQuantity, altUnit: ing.altUnit }
+          : {}),
         recipeId: recipe.id,
         recipeTitle: recipe.title,
       }))

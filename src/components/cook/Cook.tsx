@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { formatQuantity, proteinLabel } from '../../lib/util'
+import { formatMeasure, proteinLabel } from '../../lib/util'
 import { CheckIcon, ChefIcon, ChevronDownIcon, ClockIcon, CloseIcon, JournalIcon } from '../ui/icons'
 import { Timer } from './Timer'
 import { CookLogModal } from '../journal/CookLogModal'
@@ -191,7 +191,7 @@ export function Cook() {
                         checked ? 'text-slate-300' : 'text-slate-500'
                       }`}
                     >
-                      {formatQuantity(ing.quantity * scale)} {ing.unit}
+                      {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit, scale)}
                     </span>
                   </button>
                 </li>

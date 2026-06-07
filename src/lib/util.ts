@@ -78,6 +78,24 @@ export function proteinLabel(p: string): string {
   return p.charAt(0).toUpperCase() + p.slice(1)
 }
 
+/**
+ * Render an ingredient amount, including a second measurement when present,
+ * e.g. "200 g (1 cup)". Both measurements scale by the same `scale` factor.
+ */
+export function formatMeasure(
+  quantity: number,
+  unit: string,
+  altQuantity?: number,
+  altUnit?: string,
+  scale = 1
+): string {
+  const main = `${formatQuantity(quantity * scale)}${unit ? ` ${unit}` : ''}`.trim()
+  if (typeof altQuantity === 'number' && altUnit) {
+    return `${main} (${formatQuantity(altQuantity * scale)} ${altUnit})`
+  }
+  return main
+}
+
 /** Today's local calendar date as 'YYYY-MM-DD' (for date inputs). */
 export function todayISO(): string {
   const now = new Date()

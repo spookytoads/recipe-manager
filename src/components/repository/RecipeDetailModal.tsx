@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { Recipe } from '../../types'
 import { useApp } from '../../context/AppContext'
-import { formatQuantity, proteinLabel } from '../../lib/util'
+import { formatMeasure, proteinLabel } from '../../lib/util'
 import { CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
 import { Thumbnail } from './Thumbnail'
 import { hasNutrition, NutritionPanel } from './NutritionPanel'
@@ -135,8 +135,8 @@ export function RecipeDetailModal({
               {recipe.ingredients.map((ing) => (
                 <li key={ing.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
                   <span className="text-slate-700">{ing.name}</span>
-                  <span className="shrink-0 text-sm font-semibold text-slate-500">
-                    {formatQuantity(ing.quantity)} {ing.unit}
+                  <span className="shrink-0 text-right text-sm font-semibold text-slate-500">
+                    {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit)}
                   </span>
                 </li>
               ))}
