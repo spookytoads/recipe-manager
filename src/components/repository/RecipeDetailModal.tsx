@@ -6,6 +6,7 @@ import { CalendarIcon, CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } fro
 import { Thumbnail } from './Thumbnail'
 import { hasNutrition, NutritionPanel } from './NutritionPanel'
 import { StarRating } from '../journal/StarRating'
+import { reviewsForRecipe } from '../../lib/reviews'
 
 export function RecipeDetailModal({
   recipe,
@@ -18,14 +19,10 @@ export function RecipeDetailModal({
     useApp()
 
   // Past cooks of this recipe, newest first, for the rating summary + reviews.
-  // Match by recipe TITLE (case-insensitive) so reviews survive re-uploading a
-  // recipe (which gives it a new id) — also accept an exact id match.
-  const reviews = useMemo(() => {
-    const title = recipe.title.trim().toLowerCase()
-    return cookLog
-      .filter((e) => e.recipeId === recipe.id || e.recipeTitle.trim().toLowerCase() === title)
-      .sort((a, b) => b.dateCooked.localeCompare(a.dateCooked))
-  }, [cookLog, recipe.id, recipe.title])
+  const reviews = useMemo(
+    () => reviewsForRecipe(cookLog, recipe).sort((a, b) => b.dateCooked.localeCompare(a.dateCooked)),
+    [cookLog, recipe]
+  )
   const rated = reviews.filter((e) => e.rating > 0)
   const avgRating = rated.length ? rated.reduce((s, e) => s + e.rating, 0) / rated.length : 0
   const withNotes = reviews.filter((e) => e.notes.trim() || e.rating > 0)

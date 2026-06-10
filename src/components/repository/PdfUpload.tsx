@@ -23,7 +23,9 @@ export function PdfUpload({
     setBusy(true)
     onExtractingChange?.(true)
     try {
-      const { recipes, failedPages } = await extractRecipesFromPdf(file, (msg) => setStatus(msg))
+      const { recipes, failedPages, expectedCount } = await extractRecipesFromPdf(file, (msg) =>
+        setStatus(msg)
+      )
 
       // Skip recipes whose title is already in the library (makes re-uploading
       // the same cookbook safe — only the missing ones get added).
@@ -46,9 +48,13 @@ export function PdfUpload({
         message += ` (${skipped} already in your library)`
       }
       if (failedPages > 0) {
-        message += ` — ${failedPages} page${failedPages > 1 ? 's' : ''} couldn't be read; try re-uploading`
+        message += ` — ${failedPages} page${failedPages > 1 ? 's' : ''} couldn't be read`
       }
-      pushToast(message, failedPages > 0 ? 'info' : 'success')
+      const shortfall = expectedCount ? expectedCount - recipes.length : 0
+      if (shortfall > 0) {
+        message += ` — the book lists ~${expectedCount}; re-upload to retry the ${shortfall} still missing`
+      }
+      pushToast(message, failedPages > 0 || shortfall > 0 ? 'info' : 'success')
     } catch (err) {
       const message =
         err instanceof RecipeExtractionError

@@ -1,9 +1,18 @@
 import type { Recipe } from '../../types'
+import type { CookStats } from '../../lib/reviews'
 import { ClockIcon } from '../ui/icons'
 import { proteinLabel } from '../../lib/util'
 import { Thumbnail } from './Thumbnail'
 
-export function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () => void }) {
+export function RecipeCard({
+  recipe,
+  onClick,
+  cooked,
+}: {
+  recipe: Recipe
+  onClick: () => void
+  cooked?: CookStats
+}) {
   return (
     <button
       onClick={onClick}
@@ -47,6 +56,17 @@ export function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () =>
             <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
               {recipe.nutrition.calories} cal
             </span>
+          )}
+          {cooked && cooked.count > 0 && (
+            cooked.avg > 0 ? (
+              <span className="rounded-full bg-herb-50 px-2 py-0.5 font-semibold text-herb-700">
+                ★ {cooked.avg.toFixed(1)} ({cooked.count})
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-500">
+                Cooked ×{cooked.count}
+              </span>
+            )
           )}
         </div>
       </div>

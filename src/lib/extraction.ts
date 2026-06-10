@@ -30,6 +30,8 @@ export interface ExtractionResult {
   totalPages: number
   /** How many individual pages couldn't be read even after splitting + retries. */
   failedPages: number
+  /** How many recipes the inventory pass says the book contains (when known). */
+  expectedCount?: number
 }
 
 /** Encode raw bytes as a base64 string (without any data: URL prefix). */
@@ -197,7 +199,11 @@ function getApiKey(): string {
 }
 
 /** Call Gemini with the given content parts and return its raw text response. */
-async function callGemini(parts: unknown[], apiKey: string): Promise<string> {
+async function callGemini(
+  parts: unknown[],
+  apiKey: string,
+  opts?: { system?: string; maxTokens?: number }
+): Promise<string> {
   let response: Response
   try {
     response = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
@@ -205,10 +211,10 @@ async function callGemini(parts: unknown[], apiKey: string): Promise<string> {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts }],
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        system_instruction: { parts: [{ text: opts?.system ?? SYSTEM_PROMPT }] },
         generationConfig: {
           responseMimeType: 'application/json',
-          maxOutputTokens: MAX_TOKENS,
+          maxOutputTokens: opts?.maxTokens ?? MAX_TOKENS,
           temperature: 0,
           // Disable "thinking" so it doesn't consume the output budget on extraction.
           thinkingConfig: { thinkingBudget: 0 },
@@ -323,15 +329,71 @@ function dedupeByTitle(recipes: Recipe[]): Recipe[] {
   return [...byKey.values()]
 }
 
+const INVENTORY_PROMPT =
+  'You are a cookbook indexer. The input is a PDF that may contain many recipes. List EVERY distinct recipe in the order it appears. Return ONLY valid JSON of the form { "recipes": [ { "title": "...", "page": N } ] } where page is the 1-based PDF page number on which the recipe starts (count actual PDF pages, not printed page numbers). Include every recipe, even small ones (sauces, sides, dressings, drinks). Do not include chapter headers, introductions, tables of contents, or index pages as recipes.'
+
+/** Lowercased, punctuation-free form of a title for fuzzy matching. */
+function normalizeTitle(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+interface InventoryItem {
+  title: string
+  norm: string
+  page: number
+}
+
+/** One cheap pass over the whole PDF: list every recipe title + start page. */
+async function listRecipeTitles(base64: string, apiKey: string): Promise<InventoryItem[]> {
+  const text = await callGemini(
+    [
+      { inline_data: { mime_type: 'application/pdf', data: base64 } },
+      { text: 'List every recipe in this PDF as JSON, following the system instructions exactly.' },
+    ],
+    apiKey,
+    { system: INVENTORY_PROMPT, maxTokens: 16000 }
+  )
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(extractJson(text))
+  } catch {
+    return []
+  }
+  const obj = parsed as Record<string, unknown> | unknown[]
+  const arr: unknown[] = Array.isArray(obj)
+    ? obj
+    : obj && typeof obj === 'object' && Array.isArray((obj as Record<string, unknown>).recipes)
+      ? ((obj as Record<string, unknown>).recipes as unknown[])
+      : []
+  const items: InventoryItem[] = []
+  const seen = new Set<string>()
+  for (const it of arr) {
+    const rec = (it ?? {}) as Record<string, unknown>
+    const title = String(rec.title ?? '').trim()
+    const page = Math.round(asNumber(rec.page, NaN))
+    if (!title) continue
+    const norm = normalizeTitle(title)
+    if (!norm || seen.has(norm)) continue
+    seen.add(norm)
+    items.push({ title, norm, page: isFinite(page) ? page : 0 })
+  }
+  return items
+}
+
 /**
  * Send a PDF to the Gemini API and return every recipe found in it.
  *
- * The PDF is processed as a queue of page ranges (CHUNK_PAGES at a time). If a
- * range's output is truncated or unparseable, it's automatically split in half
- * and the halves are retried — down to single pages — so a dense section never
- * silently drops all its recipes. Transient failures (rate limits, network) are
- * retried with backoff. Only genuinely unreadable single pages are reported as
- * failed. `onProgress` receives human-readable status updates.
+ * Three layers of completeness protection:
+ * 1. A one-call inventory pass lists every recipe title + start page in the
+ *    whole book, so we know what "all of them" means.
+ * 2. The PDF is processed as overlapping page ranges; a range whose output is
+ *    truncated or unparseable is split in half and retried down to single pages.
+ * 3. After the main pass, any inventoried title that wasn't extracted gets a
+ *    targeted re-read of its specific pages.
+ * Transient failures (rate limits, network) retry with backoff.
  * Throws RecipeExtractionError only when nothing could be extracted at all.
  */
 export async function extractRecipesFromPdf(
@@ -375,18 +437,34 @@ export async function extractRecipesFromPdf(
     return bytesToBase64(await sub.save())
   }
 
-  // Work queue of page ranges; ranges that fail get split and pushed back on.
+  // Inventory pass (best-effort): one call over the whole book listing every
+  // recipe title + start page, so we can verify completeness afterwards.
+  let inventory: InventoryItem[] = []
+  if (total > CHUNK_PAGES) {
+    onProgress?.('Indexing the recipes in this PDF…')
+    try {
+      inventory = await listRecipeTitles(bytesToBase64(new Uint8Array(buffer)), apiKey)
+    } catch {
+      inventory = [] // purely an enhancement — extraction proceeds without it
+    }
+  }
+
+  // Work queue of page ranges with 1-page overlap, so a recipe that straddles a
+  // boundary appears complete in at least one range. Failed ranges get split.
   const queue: Array<[number, number]> = []
-  for (let s = 0; s < total; s += CHUNK_PAGES) queue.push([s, Math.min(s + CHUNK_PAGES, total)])
+  if (total <= CHUNK_PAGES) {
+    queue.push([0, total])
+  } else {
+    const step = CHUNK_PAGES - 1
+    for (let s = 0; s < total - 1; s += step) queue.push([s, Math.min(s + CHUNK_PAGES, total)])
+  }
 
   const all: Recipe[] = []
   let failedPages = 0
   let lastError: unknown = null
-  let processed = 0
 
   while (queue.length) {
     const [start, end] = queue.shift()!
-    processed += 1
     onProgress?.(
       total > CHUNK_PAGES ? `Reading pages ${start + 1}–${end} of ${total}…` : 'Reading recipe…'
     )
@@ -414,12 +492,56 @@ export async function extractRecipesFromPdf(
     if (queue.length) await sleep(700)
   }
 
+  // Recovery sweep: re-read the specific pages of any inventoried recipe that
+  // didn't make it out of the main pass.
+  if (inventory.length) {
+    const have = new Set(all.map((r) => normalizeTitle(r.title)))
+    const isExtracted = (norm: string): boolean => {
+      if (have.has(norm)) return true
+      for (const t of have) {
+        if (t.includes(norm) || norm.includes(t)) return true
+      }
+      return false
+    }
+    const missing = inventory.filter((i) => i.page > 0 && i.page <= total && !isExtracted(i.norm))
+    if (missing.length) {
+      // Read each missing recipe's start page plus a page either side; merge
+      // overlapping ranges so neighbours share one request.
+      const ranges = missing
+        .map((i) => [Math.max(0, i.page - 2), Math.min(total, i.page + 1)] as [number, number])
+        .sort((a, b) => a[0] - b[0])
+      const mergedRanges: Array<[number, number]> = []
+      for (const r of ranges) {
+        const last = mergedRanges[mergedRanges.length - 1]
+        if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1])
+        else mergedRanges.push([r[0], r[1]])
+      }
+      onProgress?.(
+        `Recovering ${missing.length} recipe${missing.length > 1 ? 's' : ''} the first pass missed…`
+      )
+      for (const [s, e] of mergedRanges.slice(0, 40)) {
+        try {
+          const recipes = await extractWithRetry(await renderRange(s, e), apiKey, file.name, onProgress)
+          all.push(...recipes)
+        } catch {
+          /* still missing — reflected via expectedCount in the result */
+        }
+        await sleep(700)
+      }
+    }
+  }
+
   const merged = dedupeByTitle(all)
   if (merged.length === 0) {
     if (lastError instanceof RecipeExtractionError) throw lastError
     throw new RecipeExtractionError("Couldn't find any recipes in that PDF.")
   }
-  return { recipes: merged, totalPages: total, failedPages }
+  return {
+    recipes: merged,
+    totalPages: total,
+    failedPages,
+    ...(inventory.length ? { expectedCount: inventory.length } : {}),
+  }
 }
 
 /**
