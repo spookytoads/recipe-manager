@@ -106,8 +106,9 @@ export function PdfUpload({
       </button>
 
       {busy && status && (
-        <p className="text-xs font-medium text-slate-500">
-          Long PDF — splitting into sections. This can take a minute.
+        <p className="max-w-sm text-xs font-medium text-slate-500">
+          Large cookbooks take several minutes — keep this tab open and your screen awake until
+          it finishes.
         </p>
       )}
 

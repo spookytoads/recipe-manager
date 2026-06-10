@@ -198,17 +198,36 @@ function getApiKey(): string {
   return apiKey
 }
 
+// How many extraction requests run at once, and the minimum spacing between
+// request starts. 3-way concurrency with ~7s spacing stays under the free
+// tier's 10-requests-per-minute cap while cutting wall-clock time ~3x.
+const CONCURRENCY = 3
+let lastRequestStart = 0
+
+/** Space out request starts to respect the free tier's per-minute cap. */
+async function paceRequests(): Promise<void> {
+  const now = Date.now()
+  const wait = Math.max(0, lastRequestStart + 7000 - now)
+  lastRequestStart = now + wait
+  if (wait > 0) await sleep(wait)
+}
+
 /** Call Gemini with the given content parts and return its raw text response. */
 async function callGemini(
   parts: unknown[],
   apiKey: string,
   opts?: { system?: string; maxTokens?: number }
 ): Promise<string> {
+  await paceRequests()
+  // Abort a hung request after 3 minutes so one stall can't freeze the import.
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 180_000)
   let response: Response
   try {
     response = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [{ parts }],
         system_instruction: { parts: [{ text: opts?.system ?? SYSTEM_PROMPT }] },
@@ -225,6 +244,8 @@ async function callGemini(
     throw new RecipeExtractionError(
       'Network error contacting the Gemini API. Check your connection and try again.'
     )
+  } finally {
+    window.clearTimeout(timeout)
   }
 
   if (!response.ok) {
@@ -462,35 +483,47 @@ export async function extractRecipesFromPdf(
   const all: Recipe[] = []
   let failedPages = 0
   let lastError: unknown = null
+  let fatalError: RecipeExtractionError | null = null
+  let done = 0
 
-  while (queue.length) {
-    const [start, end] = queue.shift()!
-    onProgress?.(
-      total > CHUNK_PAGES ? `Reading pages ${start + 1}–${end} of ${total}…` : 'Reading recipe…'
-    )
-    try {
-      const base64 = await renderRange(start, end)
-      const recipes = await extractWithRetry(base64, apiKey, file.name, onProgress)
-      all.push(...recipes)
-    } catch (err) {
-      lastError = err
-      // A bad API key (etc.) won't improve by splitting — bail out.
-      if (err instanceof RecipeExtractionError && /api key|access denied/i.test(err.message)) {
-        throw err
-      }
-      if (end - start > 1) {
-        // Truncated or garbled: split this range and retry the halves first.
-        const mid = Math.floor((start + end) / 2)
-        queue.unshift([mid, end])
-        queue.unshift([start, mid])
-      } else {
-        // A single page we still couldn't read.
-        failedPages += 1
+  // Several workers pull ranges off the shared queue concurrently; paceRequests
+  // keeps the combined request rate under the free-tier cap.
+  const worker = async (): Promise<void> => {
+    while (queue.length && !fatalError) {
+      const range = queue.shift()
+      if (!range) break
+      const [start, end] = range
+      done += 1
+      onProgress?.(
+        total > CHUNK_PAGES
+          ? `Reading pages ${start + 1}–${end} of ${total} (${done} parts done)…`
+          : 'Reading recipe…'
+      )
+      try {
+        const base64 = await renderRange(start, end)
+        const recipes = await extractWithRetry(base64, apiKey, file.name, onProgress)
+        all.push(...recipes)
+      } catch (err) {
+        lastError = err
+        // A bad API key (etc.) won't improve by splitting — stop everything.
+        if (err instanceof RecipeExtractionError && /api key|access denied/i.test(err.message)) {
+          fatalError = err
+          return
+        }
+        if (end - start > 1) {
+          // Truncated or garbled: split this range and retry the halves first.
+          const mid = Math.floor((start + end) / 2)
+          queue.unshift([mid, end])
+          queue.unshift([start, mid])
+        } else {
+          // A single page we still couldn't read.
+          failedPages += 1
+        }
       }
     }
-    // Light pacing to stay under the free-tier per-minute request cap.
-    if (queue.length) await sleep(700)
   }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker))
+  if (fatalError) throw fatalError
 
   // Recovery sweep: re-read the specific pages of any inventoried recipe that
   // didn't make it out of the main pass.
@@ -519,15 +552,27 @@ export async function extractRecipesFromPdf(
       onProgress?.(
         `Recovering ${missing.length} recipe${missing.length > 1 ? 's' : ''} the first pass missed…`
       )
-      for (const [s, e] of mergedRanges.slice(0, 40)) {
-        try {
-          const recipes = await extractWithRetry(await renderRange(s, e), apiKey, file.name, onProgress)
-          all.push(...recipes)
-        } catch {
-          /* still missing — reflected via expectedCount in the result */
+      const recoveryQueue = mergedRanges.slice(0, 40)
+      const recoveryWorker = async (): Promise<void> => {
+        while (recoveryQueue.length) {
+          const range = recoveryQueue.shift()
+          if (!range) break
+          try {
+            const recipes = await extractWithRetry(
+              await renderRange(range[0], range[1]),
+              apiKey,
+              file.name,
+              onProgress
+            )
+            all.push(...recipes)
+          } catch {
+            /* still missing — reflected via expectedCount in the result */
+          }
         }
-        await sleep(700)
       }
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, recoveryQueue.length) }, recoveryWorker)
+      )
     }
   }
 
