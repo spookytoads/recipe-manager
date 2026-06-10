@@ -7,14 +7,17 @@ import { uid } from './util'
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
-// We still split long PDFs into sections of this size — not because of an input
-// page limit (Gemini allows 1000), but so a single request's JSON output stays
-// under the token ceiling. Dense cookbooks run ~1 recipe per page, so 10 pages
-// ≈ 10 recipes per request.
-const CHUNK_PAGES = 10
+// We split long PDFs into sections of this size so a single request's JSON
+// output stays under the token ceiling. If a section's output is still too big
+// (a dense cookbook page can hold several recipes), the section is automatically
+// re-split into smaller page ranges and retried — so nothing is silently lost.
+const CHUNK_PAGES = 8
 
-// Output ceiling per request. 10 recipes' worth of JSON is well under this.
-const MAX_TOKENS = 24000
+// Output ceiling per request. gemini-2.5-flash allows up to ~65k output tokens;
+// we use a generous budget so normal sections never truncate.
+const MAX_TOKENS = 60000
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 const SYSTEM_PROMPT =
   'You are a recipe extraction assistant. The input (a PDF or pasted text) may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, servingSize, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category, altQuantity, altUnit }], steps: [{ id, order, instruction, timerSeconds }], tags[], nutrition: { calories, protein, carbs, fat, fiber, sugar, sodium } }. If the input contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. Preserve each ingredient\'s unit exactly as written (g, cups, tbsp, tsp, oz, etc.). IMPORTANT: when an ingredient lists TWO measurements (e.g. "200 g (1 cup)" or "2 tbsp (30 g)"), put the first as quantity+unit and the SECOND as altQuantity+altUnit — capture both exactly as printed; never convert or compute a second measurement yourself, and omit altQuantity/altUnit when the recipe only gives one measurement. For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other. For servingSize, copy the recipe\'s stated serving description (e.g. "1 cup (240g)") if given, else omit it. CRITICAL: include the "nutrition" object ONLY if the recipe explicitly prints nutrition facts — NEVER estimate, calculate, or invent nutrition values. If no nutrition information is printed, omit the nutrition field entirely. Nutrition is PER SERVING: calories in kcal; protein, carbs, fat, fiber, sugar in grams; sodium in milligrams.'
@@ -23,10 +26,10 @@ export class RecipeExtractionError extends Error {}
 
 export interface ExtractionResult {
   recipes: Recipe[]
-  /** Total number of sections the PDF was split into. */
-  sections: number
-  /** How many sections failed to extract (e.g. truncated/garbled output). */
-  failedSections: number
+  /** Total number of pages in the PDF (1 for pasted text). */
+  totalPages: number
+  /** How many individual pages couldn't be read even after splitting + retries. */
+  failedPages: number
 }
 
 /** Encode raw bytes as a base64 string (without any data: URL prefix). */
@@ -276,28 +279,34 @@ async function extractFromBase64(base64: string, apiKey: string, sourceFile: str
   return parseRecipes(text, sourceFile)
 }
 
-/** Split a PDF's bytes into base64-encoded sections of at most CHUNK_PAGES pages. */
-async function splitPdfToBase64(buffer: ArrayBuffer): Promise<string[]> {
-  // Lazy-load pdf-lib only when a PDF is actually uploaded, keeping it out of
-  // the initial bundle (important for fast first load / offline shell).
-  const { PDFDocument } = await import('pdf-lib')
-  const src = await PDFDocument.load(buffer, { ignoreEncryption: true })
-  const total = src.getPageCount()
+/** Should a failure be retried as-is (transient), rather than re-split? */
+function isTransient(err: unknown): boolean {
+  return (
+    err instanceof RecipeExtractionError &&
+    /rate limited|network error|temporarily|overloaded|empty response/i.test(err.message)
+  )
+}
 
-  if (total <= CHUNK_PAGES) {
-    return [bytesToBase64(new Uint8Array(buffer))]
+/** Call extraction with backoff retries for transient errors (rate limits, network). */
+async function extractWithRetry(
+  base64: string,
+  apiKey: string,
+  sourceFile: string,
+  onProgress?: (message: string) => void
+): Promise<Recipe[]> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await extractFromBase64(base64, apiKey, sourceFile)
+    } catch (err) {
+      if (isTransient(err) && attempt < 3) {
+        const waitS = 8 * (attempt + 1)
+        onProgress?.(`Rate limited — waiting ${waitS}s before retrying…`)
+        await sleep(waitS * 1000)
+        continue
+      }
+      throw err
+    }
   }
-
-  const chunks: string[] = []
-  for (let start = 0; start < total; start += CHUNK_PAGES) {
-    const end = Math.min(start + CHUNK_PAGES, total)
-    const sub = await PDFDocument.create()
-    const indices = Array.from({ length: end - start }, (_, i) => start + i)
-    const pages = await sub.copyPages(src, indices)
-    pages.forEach((p) => sub.addPage(p))
-    chunks.push(bytesToBase64(await sub.save()))
-  }
-  return chunks
 }
 
 /** Merge recipes from multiple sections, collapsing duplicates split across a boundary. */
@@ -316,10 +325,13 @@ function dedupeByTitle(recipes: Recipe[]): Recipe[] {
 
 /**
  * Send a PDF to the Gemini API and return every recipe found in it.
- * Long PDFs are split into sections, extracted, and merged. A single failing
- * section is skipped rather than aborting the whole import, so a 100-recipe
- * cookbook doesn't fail because one page didn't parse.
- * `onProgress` receives human-readable status updates for multi-section files.
+ *
+ * The PDF is processed as a queue of page ranges (CHUNK_PAGES at a time). If a
+ * range's output is truncated or unparseable, it's automatically split in half
+ * and the halves are retried — down to single pages — so a dense section never
+ * silently drops all its recipes. Transient failures (rate limits, network) are
+ * retried with backoff. Only genuinely unreadable single pages are reported as
+ * failed. `onProgress` receives human-readable status updates.
  * Throws RecipeExtractionError only when nothing could be extracted at all.
  */
 export async function extractRecipesFromPdf(
@@ -329,41 +341,85 @@ export async function extractRecipesFromPdf(
   const apiKey = getApiKey()
   const buffer = await file.arrayBuffer()
 
-  let sections: string[]
+  // Lazy-load pdf-lib only when a PDF is actually uploaded.
+  const { PDFDocument } = await import('pdf-lib')
+  let loaded: import('pdf-lib').PDFDocument | null = null
   try {
-    sections = await splitPdfToBase64(buffer)
+    loaded = await PDFDocument.load(buffer, { ignoreEncryption: true })
   } catch {
-    // If we can't parse the PDF structure (e.g. unusual encoding), fall back to
-    // sending the whole file as a single request and let the API decide.
-    sections = [bytesToBase64(new Uint8Array(buffer))]
+    loaded = null
   }
 
-  const all: Recipe[] = []
-  let failedSections = 0
-  let lastError: unknown = null
+  if (!loaded) {
+    // Can't parse the PDF structure — send the whole file as one request.
+    const recipes = await extractWithRetry(
+      bytesToBase64(new Uint8Array(buffer)),
+      apiKey,
+      file.name,
+      onProgress
+    )
+    const merged = dedupeByTitle(recipes)
+    if (merged.length === 0) throw new RecipeExtractionError("Couldn't find any recipes in that PDF.")
+    return { recipes: merged, totalPages: 1, failedPages: 0 }
+  }
 
-  for (let i = 0; i < sections.length; i++) {
-    if (sections.length > 1) {
-      onProgress?.(`Reading section ${i + 1} of ${sections.length}…`)
-    }
+  const src = loaded
+  const total = src.getPageCount()
+
+  // Render a [start, end) page range to a base64 PDF.
+  const renderRange = async (start: number, end: number): Promise<string> => {
+    const sub = await PDFDocument.create()
+    const indices = Array.from({ length: end - start }, (_, i) => start + i)
+    const pages = await sub.copyPages(src, indices)
+    pages.forEach((p) => sub.addPage(p))
+    return bytesToBase64(await sub.save())
+  }
+
+  // Work queue of page ranges; ranges that fail get split and pushed back on.
+  const queue: Array<[number, number]> = []
+  for (let s = 0; s < total; s += CHUNK_PAGES) queue.push([s, Math.min(s + CHUNK_PAGES, total)])
+
+  const all: Recipe[] = []
+  let failedPages = 0
+  let lastError: unknown = null
+  let processed = 0
+
+  while (queue.length) {
+    const [start, end] = queue.shift()!
+    processed += 1
+    onProgress?.(
+      total > CHUNK_PAGES ? `Reading pages ${start + 1}–${end} of ${total}…` : 'Reading recipe…'
+    )
     try {
-      const recipes = await extractFromBase64(sections[i], apiKey, file.name)
+      const base64 = await renderRange(start, end)
+      const recipes = await extractWithRetry(base64, apiKey, file.name, onProgress)
       all.push(...recipes)
     } catch (err) {
-      // For a one-shot file, surface the real error (bad key, network, etc.).
-      if (sections.length === 1) throw err
       lastError = err
-      failedSections += 1
+      // A bad API key (etc.) won't improve by splitting — bail out.
+      if (err instanceof RecipeExtractionError && /api key|access denied/i.test(err.message)) {
+        throw err
+      }
+      if (end - start > 1) {
+        // Truncated or garbled: split this range and retry the halves first.
+        const mid = Math.floor((start + end) / 2)
+        queue.unshift([mid, end])
+        queue.unshift([start, mid])
+      } else {
+        // A single page we still couldn't read.
+        failedPages += 1
+      }
     }
+    // Light pacing to stay under the free-tier per-minute request cap.
+    if (queue.length) await sleep(700)
   }
 
   const merged = dedupeByTitle(all)
   if (merged.length === 0) {
-    // Nothing parsed — surface the underlying reason if we captured one.
     if (lastError instanceof RecipeExtractionError) throw lastError
     throw new RecipeExtractionError("Couldn't find any recipes in that PDF.")
   }
-  return { recipes: merged, sections: sections.length, failedSections }
+  return { recipes: merged, totalPages: total, failedPages }
 }
 
 /**
@@ -388,5 +444,5 @@ export async function extractRecipesFromText(rawText: string): Promise<Extractio
   if (recipes.length === 0) {
     throw new RecipeExtractionError("Couldn't find a recipe in that text.")
   }
-  return { recipes, sections: 1, failedSections: 0 }
+  return { recipes, totalPages: 1, failedPages: 0 }
 }

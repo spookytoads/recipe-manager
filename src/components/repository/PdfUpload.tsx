@@ -9,7 +9,7 @@ export function PdfUpload({
 }: {
   onExtractingChange?: (extracting: boolean) => void
 }) {
-  const { addRecipe, pushToast } = useApp()
+  const { addRecipe, pushToast, recipes: existingRecipes } = useApp()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -23,20 +23,32 @@ export function PdfUpload({
     setBusy(true)
     onExtractingChange?.(true)
     try {
-      const { recipes, failedSections } = await extractRecipesFromPdf(file, (msg) =>
-        setStatus(msg)
-      )
-      // Add in reverse so the first recipe in the document ends up on top.
-      for (const recipe of [...recipes].reverse()) addRecipe(recipe)
+      const { recipes, failedPages } = await extractRecipesFromPdf(file, (msg) => setStatus(msg))
 
-      let message =
-        recipes.length === 1
-          ? `"${recipes[0].title}" extracted and added to your library`
-          : `Extracted ${recipes.length} recipes from ${file.name}`
-      if (failedSections > 0) {
-        message += ` — ${failedSections} section${failedSections > 1 ? 's' : ''} couldn't be read`
+      // Skip recipes whose title is already in the library (makes re-uploading
+      // the same cookbook safe — only the missing ones get added).
+      const have = new Set(existingRecipes.map((r) => r.title.trim().toLowerCase()))
+      const fresh = recipes.filter((r) => !have.has(r.title.trim().toLowerCase()))
+      const skipped = recipes.length - fresh.length
+
+      // Add in reverse so the first recipe in the document ends up on top.
+      for (const recipe of [...fresh].reverse()) addRecipe(recipe)
+
+      let message: string
+      if (fresh.length === 0) {
+        message = `Those ${recipes.length} recipes are already in your library`
+      } else if (fresh.length === 1) {
+        message = `"${fresh[0].title}" extracted and added to your library`
+      } else {
+        message = `Added ${fresh.length} recipes from ${file.name}`
       }
-      pushToast(message, failedSections > 0 ? 'info' : 'success')
+      if (skipped > 0 && fresh.length > 0) {
+        message += ` (${skipped} already in your library)`
+      }
+      if (failedPages > 0) {
+        message += ` — ${failedPages} page${failedPages > 1 ? 's' : ''} couldn't be read; try re-uploading`
+      }
+      pushToast(message, failedPages > 0 ? 'info' : 'success')
     } catch (err) {
       const message =
         err instanceof RecipeExtractionError
