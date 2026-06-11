@@ -8,6 +8,7 @@ import { RecipeCard, RecipeCardSkeleton } from './RecipeCard'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { PdfUpload } from './PdfUpload'
 import { AddRecipeModal } from './AddRecipeModal'
+import { ImportExport } from './ImportExport'
 
 type CookedFilter = 'all' | 'cooked' | 'uncooked'
 type SortKey = 'newest' | 'rating' | 'title'
@@ -68,11 +69,14 @@ export function Repository() {
             {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
           </p>
         </div>
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
-          <button onClick={() => setAdding(true)} className="btn-secondary">
-            <PlusIcon width={18} height={18} /> Add manually
-          </button>
-          <PdfUpload onExtractingChange={setExtracting} />
+        <div className="flex flex-col items-stretch gap-2">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
+            <button onClick={() => setAdding(true)} className="btn-secondary">
+              <PlusIcon width={18} height={18} /> Add manually
+            </button>
+            <PdfUpload onExtractingChange={setExtracting} />
+          </div>
+          <ImportExport />
         </div>
       </div>
 

@@ -72,6 +72,8 @@ interface AppContextValue {
   addCookLog: (entry: Omit<CookLogEntry, 'id'>) => CookLogEntry
   updateCookLog: (id: string, patch: Partial<Omit<CookLogEntry, 'id'>>) => void
   deleteCookLog: (id: string) => void
+  /** Merge journal entries from a backup file, skipping ids already present. */
+  mergeCookLog: (entries: CookLogEntry[]) => void
 
   // Cloud sync
   cloudEnabled: boolean
@@ -415,6 +417,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCookLog((prev) => prev.filter((e) => e.id !== id))
   }, [])
 
+  const mergeCookLog = useCallback((entries: CookLogEntry[]) => {
+    setCookLog((prev) => {
+      const ids = new Set(prev.map((e) => e.id))
+      const fresh = entries.filter(
+        (e) => e && typeof e.id === 'string' && e.id && !ids.has(e.id) && typeof e.recipeTitle === 'string'
+      )
+      return fresh.length ? [...fresh, ...prev] : prev
+    })
+  }, [])
+
   const value = useMemo<AppContextValue>(
     () => ({
       section,
@@ -444,6 +456,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCookLog,
       updateCookLog,
       deleteCookLog,
+      mergeCookLog,
       cloudEnabled: isSupabaseConfigured,
       user,
       syncStatus,
@@ -480,6 +493,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCookLog,
       updateCookLog,
       deleteCookLog,
+      mergeCookLog,
       user,
       syncStatus,
       signIn,

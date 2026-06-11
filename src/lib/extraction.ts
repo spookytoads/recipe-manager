@@ -106,7 +106,7 @@ function asNutrition(raw: unknown): Nutrition | undefined {
 }
 
 /** Coerce arbitrary parsed JSON into a well-formed Recipe with stable ids. */
-function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
+export function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
   if (typeof raw !== 'object' || raw === null) {
     throw new RecipeExtractionError('Extracted recipe was not an object.')
   }
