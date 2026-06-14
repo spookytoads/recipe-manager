@@ -25,6 +25,8 @@ export function Repository() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ProteinFilter>('All')
   const [cookedFilter, setCookedFilter] = useState<CookedFilter>('all')
+  const [calMin, setCalMin] = useState<number | null>(null)
+  const [calMax, setCalMax] = useState<number | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const [selected, setSelected] = useState<Recipe | null>(null)
   const [extracting, setExtracting] = useState(false)
@@ -38,9 +40,22 @@ export function Repository() {
     return m
   }, [recipes, cookLog])
 
+  // Calorie range filter (per serving). When a bound is set, recipes without a
+  // calorie value are excluded since they can't be compared.
+  const inCalorieRange = (r: Recipe): boolean => {
+    if (calMin === null && calMax === null) return true
+    const c = r.nutrition?.calories
+    if (typeof c !== 'number') return false
+    if (calMin !== null && c < calMin) return false
+    if (calMax !== null && c > calMax) return false
+    return true
+  }
+
   const filtered = useMemo(() => {
     const statFor = (r: Recipe): CookStats => stats.get(r.id) ?? { count: 0, avg: 0 }
-    let list = recipes.filter((r) => matchesSearch(r, query) && matchesProtein(r, filter))
+    let list = recipes.filter(
+      (r) => matchesSearch(r, query) && matchesProtein(r, filter) && inCalorieRange(r)
+    )
     if (cookedFilter !== 'all') {
       list = list.filter((r) => (statFor(r).count > 0) === (cookedFilter === 'cooked'))
     }
@@ -55,7 +70,7 @@ export function Repository() {
       list = [...list].sort((a, b) => a.title.localeCompare(b.title))
     }
     return list
-  }, [recipes, query, filter, cookedFilter, sortKey, stats])
+  }, [recipes, query, filter, cookedFilter, calMin, calMax, sortKey, stats])
 
   const hasRecipes = recipes.length > 0
 
@@ -76,7 +91,7 @@ export function Repository() {
             className="btn-primary mt-3"
             title="Roll the dice for three random dinner ideas"
           >
-            <DiceIcon width={18} height={18} /> Weeknight Roulette
+            <DiceIcon width={18} height={18} /> Feeling Frisky?
           </button>
         </div>
         <div className="flex flex-col items-stretch gap-2">
@@ -126,6 +141,49 @@ export function Repository() {
         })}
       </div>
 
+      {/* Calorie filter — an "All" toggle (orange when active) + a typed min–max range */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => {
+            setCalMin(null)
+            setCalMax(null)
+          }}
+          className={`chip ${
+            calMin === null && calMax === null
+              ? 'border-orange-500 bg-orange-500 text-white shadow-sm'
+              : 'border-slate-200 bg-white text-slate-600 hover:border-orange-300 hover:text-orange-700'
+          }`}
+        >
+          All
+        </button>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={calMin ?? ''}
+            onChange={(e) => setCalMin(e.target.value === '' ? null : Number(e.target.value))}
+            placeholder="min"
+            aria-label="Minimum calories"
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+          />
+          <span className="text-slate-400">–</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={calMax ?? ''}
+            onChange={(e) => setCalMax(e.target.value === '' ? null : Number(e.target.value))}
+            placeholder="max"
+            aria-label="Maximum calories"
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+          />
+          <span className="ml-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Calories
+          </span>
+        </div>
+      </div>
+
       {/* Cooked filter + sort */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
         {COOKED_FILTERS.map(({ id, label }) => {
@@ -164,7 +222,15 @@ export function Repository() {
       ) : !hasRecipes ? (
         <EmptyLibrary onAdd={() => setAdding(true)} />
       ) : filtered.length === 0 ? (
-        <NoMatches onReset={() => { setQuery(''); setFilter('All'); setCookedFilter('all') }} />
+        <NoMatches
+          onReset={() => {
+            setQuery('')
+            setFilter('All')
+            setCookedFilter('all')
+            setCalMin(null)
+            setCalMax(null)
+          }}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {extracting && <RecipeCardSkeleton />}
