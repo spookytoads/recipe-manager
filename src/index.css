@@ -60,6 +60,58 @@ body {
   }
 }
 
+/* ── 3D rolling die (Weeknight Roulette) ───────────────────────────────────── */
+.dice-scene {
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  perspective: 700px;
+}
+/* A static isometric tilt so a settled face still reads as a 3D cube. */
+.dice-tilt {
+  transform: rotateX(-24deg) rotateY(-24deg);
+  transform-style: preserve-3d;
+}
+.dice {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  transform-style: preserve-3d;
+}
+.dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 3px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  box-shadow: inset 0 -6px 10px rgba(15, 23, 42, 0.06);
+  backface-visibility: hidden;
+}
+.dice-face span {
+  border-radius: 9999px;
+}
+.dice-face span.on {
+  background: #2f6b32; /* herb-600 */
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+.dice-shadow {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 70px;
+  height: 14px;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0));
+  filter: blur(1px);
+}
+
 /* Custom scrollbars for a cleaner look on desktop */
 ::-webkit-scrollbar {
   width: 10px;

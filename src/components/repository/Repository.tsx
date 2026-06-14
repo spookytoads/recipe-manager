@@ -74,7 +74,7 @@ export function Repository() {
             onClick={() => setRoulette(true)}
             disabled={recipes.length === 0}
             className="btn-primary mt-3"
-            title="Spin for three random dinner ideas"
+            title="Roll the dice for three random dinner ideas"
           >
             <DiceIcon width={18} height={18} /> Weeknight Roulette
           </button>

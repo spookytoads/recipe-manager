@@ -6,10 +6,37 @@ import { recipeColor } from '../../lib/colors'
 import { Thumbnail } from '../repository/Thumbnail'
 import { ChefIcon, ClockIcon, CloseIcon, DiceIcon } from '../ui/icons'
 
-const SPIN_MS = 4200
-const MAX_SEGMENTS = 8
-const SIZE = 280
-const R = 130
+const ROLL_MS = 1300
+
+// Cube rotation (deg) that brings each face toward the viewer.
+const FACE_ROT: Record<number, { x: number; y: number }> = {
+  1: { x: 0, y: 0 },
+  2: { x: -90, y: 0 },
+  3: { x: 0, y: -90 },
+  4: { x: 0, y: 90 },
+  5: { x: 90, y: 0 },
+  6: { x: 0, y: 180 },
+}
+
+// Which of the 9 grid cells (1–9, row-major) hold a pip for each face value.
+const PIPS: Record<number, number[]> = {
+  1: [5],
+  2: [1, 9],
+  3: [1, 5, 9],
+  4: [1, 3, 7, 9],
+  5: [1, 3, 5, 7, 9],
+  6: [1, 4, 7, 3, 6, 9],
+}
+
+// How the six faces are positioned on the cube.
+const FACE_PLACEMENT: Record<number, string> = {
+  1: 'translateZ(36px)',
+  2: 'rotateX(90deg) translateZ(36px)',
+  3: 'rotateY(90deg) translateZ(36px)',
+  4: 'rotateY(-90deg) translateZ(36px)',
+  5: 'rotateX(-90deg) translateZ(36px)',
+  6: 'rotateY(180deg) translateZ(36px)',
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -20,20 +47,15 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-/** Pie-slice path, angles measured in degrees clockwise from 12 o'clock. */
-function slicePath(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
-  const a0 = (startDeg * Math.PI) / 180
-  const a1 = (endDeg * Math.PI) / 180
-  const x0 = cx + r * Math.sin(a0)
-  const y0 = cy - r * Math.cos(a0)
-  const x1 = cx + r * Math.sin(a1)
-  const y1 = cy - r * Math.cos(a1)
-  const large = endDeg - startDeg > 180 ? 1 : 0
-  return `M ${cx} ${cy} L ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} Z`
-}
-
-function truncate(s: string, n: number): string {
-  return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s
+function DieFace({ value }: { value: number }) {
+  const on = PIPS[value]
+  return (
+    <div className="dice-face" style={{ transform: FACE_PLACEMENT[value] }}>
+      {Array.from({ length: 9 }, (_, i) => (
+        <span key={i} className={on.includes(i + 1) ? 'on' : ''} />
+      ))}
+    </div>
+  )
 }
 
 export function RouletteModal({
@@ -46,93 +68,64 @@ export function RouletteModal({
 }) {
   const { recipes } = useApp()
   const [protein, setProtein] = useState<ProteinFilter>('All')
-  const [spinning, setSpinning] = useState(false)
-  const [rotation, setRotation] = useState(0)
-  const [segments, setSegments] = useState<Recipe[]>([])
+  const [rolling, setRolling] = useState(false)
+  const [rot, setRot] = useState({ x: 0, y: 0 })
   const [results, setResults] = useState<Recipe[] | null>(null)
-  const rotationRef = useRef(0)
-  const spinTimer = useRef<number | null>(null)
+  const rotRef = useRef(rot)
+  const rollTimer = useRef<number | null>(null)
 
   const pool = useMemo(
     () => recipes.filter((r) => matchesProtein(r, protein)),
     [recipes, protein]
   )
 
-  // Keep the latest pool reachable from the one-shot auto-spin effect.
-  const poolRef = useRef(pool)
-  poolRef.current = pool
+  const roll = () => {
+    if (rolling || pool.length === 0) return
 
-  // What's drawn on the wheel: the locked-in spin segments, or a preview of the pool.
-  const wheelSegments = useMemo(
-    () => (segments.length ? segments : shuffle(pool).slice(0, MAX_SEGMENTS)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [segments, protein, pool.length]
-  )
+    // Tumble several full turns on both axes, landing flat on a random face.
+    const face = 1 + Math.floor(Math.random() * 6)
+    const base = FACE_ROT[face]
+    const cur = rotRef.current
+    const dx = ((base.x - cur.x) % 360 + 360) % 360
+    const dy = ((base.y - cur.y) % 360 + 360) % 360
+    const next = {
+      x: cur.x + 360 * (4 + Math.floor(Math.random() * 3)) + dx,
+      y: cur.y + 360 * (4 + Math.floor(Math.random() * 3)) + dy,
+    }
+    rotRef.current = next
 
-  const runSpin = (currentPool: Recipe[]) => {
-    if (currentPool.length === 0) return
-    const shuffled = shuffle(currentPool)
-    const winners = shuffled.slice(0, Math.min(3, currentPool.length))
-    const segCount = Math.min(currentPool.length, MAX_SEGMENTS)
-    const fill = shuffled
-      .filter((r) => !winners.some((w) => w.id === r.id))
-      .slice(0, Math.max(0, segCount - winners.length))
-    const segs = shuffle([...winners, ...fill]).slice(0, segCount)
-    const winnerIndex = Math.max(0, segs.findIndex((s) => s.id === winners[0].id))
-
-    const segAngle = 360 / segs.length
-    const center = winnerIndex * segAngle + segAngle / 2
-    const jitter = (Math.random() - 0.5) * segAngle * 0.6
-    // Land the winner's slice under the top pointer: final rotation ≡ -center (mod 360).
-    const desiredMod = ((-center - jitter) % 360 + 360) % 360
-    const currentMod = ((rotationRef.current % 360) + 360) % 360
-    const forward = (desiredMod - currentMod + 360) % 360
-    const next = rotationRef.current + 360 * 5 + forward
-    rotationRef.current = next
-
-    setSegments(segs)
     setResults(null)
-    setSpinning(true)
-    setRotation(next)
+    setRolling(true)
+    setRot(next)
 
-    if (spinTimer.current) window.clearTimeout(spinTimer.current)
-    spinTimer.current = window.setTimeout(() => {
-      setSpinning(false)
-      setResults(winners)
-    }, SPIN_MS + 80)
-  }
-
-  const spin = () => {
-    if (spinning) return
-    runSpin(pool)
+    if (rollTimer.current) window.clearTimeout(rollTimer.current)
+    rollTimer.current = window.setTimeout(() => {
+      setRolling(false)
+      setResults(shuffle(pool).slice(0, Math.min(3, pool.length)))
+    }, ROLL_MS + 60)
   }
 
   const chooseProtein = (p: ProteinFilter) => {
-    if (spinning) return
+    if (rolling) return
     setProtein(p)
     setResults(null)
-    setSegments([])
   }
 
-  // Auto-spin once when the modal opens, plus Escape-to-close and scroll lock.
+  // Escape-to-close + scroll lock while open.
   useEffect(() => {
-    const t = window.setTimeout(() => runSpin(poolRef.current), 250)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     return () => {
-      window.clearTimeout(t)
-      if (spinTimer.current) window.clearTimeout(spinTimer.current)
+      if (rollTimer.current) window.clearTimeout(rollTimer.current)
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [onClose])
 
-  const segAngle = 360 / Math.max(1, wheelSegments.length)
-  const canSpin = pool.length > 0
+  const canRoll = pool.length > 0
 
   return (
     <div
@@ -167,11 +160,9 @@ export function RouletteModal({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <p className="mb-3 text-center text-sm text-slate-500">
-            Three dinner ideas, picked at random. Filter by protein and spin again for more.
+          <p className="mb-1 text-center text-sm font-semibold text-slate-700">
+            1. Pick a protein
           </p>
-
-          {/* Protein selector */}
           <div className="mb-5 flex flex-wrap justify-center gap-2">
             {PROTEIN_FILTERS.map((f) => {
               const active = protein === f
@@ -179,12 +170,12 @@ export function RouletteModal({
                 <button
                   key={f}
                   onClick={() => chooseProtein(f)}
-                  disabled={spinning}
+                  disabled={rolling}
                   className={`chip !min-h-0 !min-w-0 px-3 py-1.5 text-xs ${
                     active
                       ? 'border-herb-500 bg-herb-500 text-white shadow-sm'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-herb-300 hover:text-herb-700'
-                  } ${spinning ? 'cursor-not-allowed opacity-60' : ''}`}
+                  } ${rolling ? 'cursor-not-allowed opacity-60' : ''}`}
                 >
                   {f}
                 </button>
@@ -192,94 +183,49 @@ export function RouletteModal({
             })}
           </div>
 
-          {/* Wheel */}
+          <p className="mb-2 text-center text-sm font-semibold text-slate-700">
+            2. Roll the dice
+          </p>
+
+          {/* Dice */}
           <div className="flex flex-col items-center">
-            <div className="relative" style={{ width: SIZE, height: SIZE, maxWidth: '100%' }}>
-              {/* Pointer */}
-              <div className="absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1">
-                <svg width="32" height="32" viewBox="0 0 34 34" aria-hidden>
-                  <path
-                    d="M17 30 L6 8 a 12 6 0 0 1 22 0 Z"
-                    fill="#1e293b"
-                    stroke="#fff"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <svg
-                viewBox={`0 0 ${SIZE} ${SIZE}`}
-                className="h-full w-full drop-shadow-md"
-                style={{
-                  transform: `rotate(${rotation}deg)`,
-                  transition: spinning
-                    ? `transform ${SPIN_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`
-                    : 'none',
-                }}
-              >
-                <circle cx={SIZE / 2} cy={SIZE / 2} r={R + 6} fill="#fff" />
-                {wheelSegments.length === 0 && (
-                  <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="#e2e8f0" />
-                )}
-                {wheelSegments.map((seg, i) => {
-                  const start = i * segAngle
-                  const end = start + segAngle
-                  const mid = start + segAngle / 2
-                  const color = recipeColor(seg.title)
-                  const flip = mid > 90 && mid < 270
-                  const labelR = R * 0.34
-                  const tx = SIZE / 2 + Math.sin((mid * Math.PI) / 180) * labelR
-                  const ty = SIZE / 2 - Math.cos((mid * Math.PI) / 180) * labelR
-                  return (
-                    <g key={seg.id}>
-                      <path
-                        d={slicePath(SIZE / 2, SIZE / 2, R, start, end)}
-                        fill={color.bg}
-                        stroke="#fff"
-                        strokeWidth="2"
-                      />
-                      <text
-                        x={tx}
-                        y={ty}
-                        fill={color.text}
-                        fontSize="10"
-                        fontWeight="700"
-                        textAnchor={flip ? 'end' : 'start'}
-                        transform={`rotate(${flip ? mid + 180 : mid} ${tx} ${ty})`}
-                        dominantBaseline="middle"
-                      >
-                        {truncate(seg.title, 16)}
-                      </text>
-                    </g>
-                  )
-                })}
-              </svg>
-
-              {/* Center hub — also a spin button */}
-              <button
-                onClick={spin}
-                disabled={!canSpin || spinning}
-                className="absolute left-1/2 top-1/2 z-10 flex h-[64px] w-[64px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-4 border-white bg-herb-500 text-white shadow-lg transition-transform hover:bg-herb-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label="Spin the wheel"
-              >
-                <DiceIcon width={20} height={20} />
-                <span className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wide">
-                  {spinning ? '…' : 'Spin'}
-                </span>
-              </button>
-            </div>
-
             <button
-              onClick={spin}
-              disabled={!canSpin || spinning}
-              className="btn-primary mt-5 px-8"
+              onClick={roll}
+              disabled={!canRoll || rolling}
+              className="relative cursor-pointer rounded-2xl p-2 transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Roll the dice"
+              title="Roll the dice"
             >
-              <DiceIcon width={18} height={18} />
-              {spinning ? 'Spinning…' : results ? 'Spin again' : 'Spin the wheel'}
+              <div className="dice-shadow" />
+              <div className={`dice-scene ${rolling ? 'animate-dice-bounce' : ''}`}>
+                <div className="dice-tilt">
+                  <div
+                    className="dice"
+                    style={{
+                      transform: `rotateX(${rot.x}deg) rotateY(${rot.y}deg)`,
+                      transition: rolling
+                        ? `transform ${ROLL_MS}ms cubic-bezier(0.2, 0.8, 0.3, 1)`
+                        : 'none',
+                    }}
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((v) => (
+                      <DieFace key={v} value={v} />
+                    ))}
+                  </div>
+                </div>
+              </div>
             </button>
 
-            {!canSpin && (
+            <button
+              onClick={roll}
+              disabled={!canRoll || rolling}
+              className="btn-primary mt-3 px-8"
+            >
+              <DiceIcon width={18} height={18} />
+              {rolling ? 'Rolling…' : results ? 'Roll again' : 'Roll the dice'}
+            </button>
+
+            {!canRoll && (
               <p className="mt-4 text-center text-sm text-slate-500">
                 No {protein === 'All' ? '' : `${protein.toLowerCase()} `}recipes in your library yet.
               </p>
