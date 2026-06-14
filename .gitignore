@@ -15,6 +15,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+gemini-key.txt
 
 # Editor
 .vscode/*

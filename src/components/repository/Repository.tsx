@@ -3,12 +3,13 @@ import { useApp } from '../../context/AppContext'
 import { PROTEIN_FILTERS, type ProteinFilter, type Recipe } from '../../types'
 import { matchesProtein, matchesSearch } from '../../lib/util'
 import { cookStats, type CookStats } from '../../lib/reviews'
-import { BookIcon, PlusIcon, SearchIcon, UploadIcon } from '../ui/icons'
+import { BookIcon, DiceIcon, PlusIcon, SearchIcon, UploadIcon } from '../ui/icons'
 import { RecipeCard, RecipeCardSkeleton } from './RecipeCard'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { PdfUpload } from './PdfUpload'
 import { AddRecipeModal } from './AddRecipeModal'
 import { ImportExport } from './ImportExport'
+import { RouletteModal } from '../roulette/RouletteModal'
 
 type CookedFilter = 'all' | 'cooked' | 'uncooked'
 type SortKey = 'newest' | 'rating' | 'title'
@@ -28,6 +29,7 @@ export function Repository() {
   const [selected, setSelected] = useState<Recipe | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [roulette, setRoulette] = useState(false)
 
   // Per-recipe cook count + average rating from the journal.
   const stats = useMemo(() => {
@@ -68,6 +70,14 @@ export function Repository() {
           <p className="mt-1 text-sm text-slate-500">
             {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
           </p>
+          <button
+            onClick={() => setRoulette(true)}
+            disabled={recipes.length === 0}
+            className="btn-primary mt-3"
+            title="Spin for three random dinner ideas"
+          >
+            <DiceIcon width={18} height={18} /> Weeknight Roulette
+          </button>
         </div>
         <div className="flex flex-col items-stretch gap-2">
           <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
@@ -169,6 +179,16 @@ export function Repository() {
       )}
 
       {adding && <AddRecipeModal onClose={() => setAdding(false)} />}
+
+      {roulette && (
+        <RouletteModal
+          onClose={() => setRoulette(false)}
+          onPick={(r) => {
+            setRoulette(false)
+            setSelected(r)
+          }}
+        />
+      )}
     </div>
   )
 }

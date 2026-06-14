@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { aggregateKey, useApp } from '../../context/AppContext'
 import { CATEGORIES, type Category } from '../../types'
 import { formatMeasure } from '../../lib/util'
-import { CartIcon, CheckIcon, CloseIcon } from '../ui/icons'
+import { recipeColor } from '../../lib/colors'
+import { CartIcon, CheckIcon, CloseIcon, ListChecksIcon } from '../ui/icons'
 
 interface AggregatedItem {
   key: string
@@ -118,6 +119,47 @@ export function Shopping() {
 
   const orderedCategories = CATEGORIES.filter((c) => grouped.has(c))
 
+  // Build a checklist and hand it to Apple Notes via the share sheet (iOS/iPadOS/
+  // macOS show "Notes" there). Falls back to copying when sharing isn't available.
+  const handleExportToNotes = async () => {
+    const lines: string[] = [`Shopping List${multiplier > 1 ? ` (${multiplier}×)` : ''}`, '']
+    for (const category of orderedCategories) {
+      const items = grouped.get(category)!
+      lines.push(category.toUpperCase())
+      for (const item of items) {
+        const checked = checkedKeys.includes(item.key)
+        const amount = formatMeasure(
+          item.quantity,
+          item.unit,
+          item.altOk ? item.altQuantity : undefined,
+          item.altOk ? item.altUnit : undefined,
+          multiplier
+        )
+        lines.push(`${checked ? '☑' : '☐'} ${item.name}${amount ? ` — ${amount}` : ''}`)
+      }
+      lines.push('')
+    }
+    const text = lines.join('\n').trimEnd()
+
+    const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> }
+    if (nav.share) {
+      try {
+        await nav.share({ title: 'Shopping List', text })
+        return
+      } catch (err) {
+        // User dismissed the share sheet — nothing to do.
+        if ((err as DOMException)?.name === 'AbortError') return
+        // Otherwise fall through to the clipboard fallback.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      pushToast('Checklist copied — paste into Apple Notes, then tap the checklist button', 'success')
+    } catch {
+      pushToast('Could not export the list on this device', 'error')
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-3 py-5 sm:px-6 sm:py-8">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -162,6 +204,13 @@ export function Shopping() {
           />
         </div>
         <button
+          onClick={handleExportToNotes}
+          className="btn-secondary"
+          title="Export to Apple Notes as a checklist"
+        >
+          <ListChecksIcon width={16} height={16} /> Apple Notes
+        </button>
+        <button
           onClick={clearChecked}
           disabled={checkedCount === 0}
           className="btn-secondary"
@@ -180,25 +229,33 @@ export function Shopping() {
             From {sourceRecipes.length} {sourceRecipes.length === 1 ? 'recipe' : 'recipes'}
           </p>
           <div className="flex flex-wrap gap-2">
-            {sourceRecipes.map((r) => (
-              <span
-                key={r.id}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-3 pr-1 text-sm font-medium text-slate-700"
-              >
-                {r.title}
-                <button
-                  onClick={() => {
-                    removeRecipeFromShopping(r.id)
-                    pushToast(`Removed "${r.title}" from your shopping list`, 'info')
-                  }}
-                  className="tap-target flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                  aria-label={`Remove ${r.title} from shopping list`}
-                  title={`Remove ${r.title}`}
+            {sourceRecipes.map((r) => {
+              const color = recipeColor(r.title)
+              return (
+                <span
+                  key={r.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 text-sm font-semibold"
+                  style={{ backgroundColor: color.bg, color: color.text, borderColor: color.border }}
                 >
-                  <CloseIcon width={15} height={15} />
-                </button>
-              </span>
-            ))}
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: color.accent }}
+                  />
+                  {r.title}
+                  <button
+                    onClick={() => {
+                      removeRecipeFromShopping(r.id)
+                      pushToast(`Removed "${r.title}" from your shopping list`, 'info')
+                    }}
+                    className="tap-target flex h-7 w-7 items-center justify-center rounded-full opacity-60 transition-colors hover:bg-red-50 hover:text-red-500 hover:opacity-100"
+                    aria-label={`Remove ${r.title} from shopping list`}
+                    title={`Remove ${r.title}`}
+                  >
+                    <CloseIcon width={15} height={15} />
+                  </button>
+                </span>
+              )
+            })}
           </div>
         </div>
       )}
@@ -244,14 +301,20 @@ export function Shopping() {
                           </p>
                           {item.sources.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
-                              {item.sources.map((s) => (
-                                <span
-                                  key={s}
-                                  className="rounded-full bg-herb-50 px-2 py-0.5 text-[10px] font-medium text-herb-600"
-                                >
-                                  {s}
-                                </span>
-                              ))}
+                              {item.sources.map((s) => {
+                                const color = recipeColor(s)
+                                return (
+                                  <span
+                                    key={s}
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition-opacity ${
+                                      checked ? 'opacity-40' : ''
+                                    }`}
+                                    style={{ backgroundColor: color.bg, color: color.text }}
+                                  >
+                                    {s}
+                                  </span>
+                                )
+                              })}
                             </div>
                           )}
                         </div>
