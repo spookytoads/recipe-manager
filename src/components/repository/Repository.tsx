@@ -1,9 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useApp } from '../../context/AppContext'
 import { PROTEIN_FILTERS, type ProteinFilter, type Recipe } from '../../types'
-import { matchesProtein, matchesSearch } from '../../lib/util'
+import { matchesProtein, matchesSearch, sourceLabel } from '../../lib/util'
 import { cookStats, type CookStats } from '../../lib/reviews'
-import { BookIcon, DiceIcon, PlusIcon, SearchIcon, UploadIcon } from '../ui/icons'
+import {
+  BookIcon,
+  ChevronDownIcon,
+  CloseIcon,
+  DiceIcon,
+  FilterIcon,
+  PlusIcon,
+  SearchIcon,
+  UploadIcon,
+} from '../ui/icons'
 import { RecipeCard, RecipeCardSkeleton } from './RecipeCard'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { PdfUpload } from './PdfUpload'
@@ -27,7 +36,9 @@ export function Repository() {
   const [cookedFilter, setCookedFilter] = useState<CookedFilter>('all')
   const [calMin, setCalMin] = useState<number | null>(null)
   const [calMax, setCalMax] = useState<number | null>(null)
+  const [cookbook, setCookbook] = useState<string>('All')
   const [sortKey, setSortKey] = useState<SortKey>('newest')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [selected, setSelected] = useState<Recipe | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -39,6 +50,13 @@ export function Repository() {
     for (const r of recipes) m.set(r.id, cookStats(cookLog, r))
     return m
   }, [recipes, cookLog])
+
+  // Distinct cookbook/source names for the filter dropdown.
+  const cookbooks = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of recipes) set.add(sourceLabel(r.sourceFile))
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [recipes])
 
   // Calorie range filter (per serving). When a bound is set, recipes without a
   // calorie value are excluded since they can't be compared.
@@ -54,7 +72,11 @@ export function Repository() {
   const filtered = useMemo(() => {
     const statFor = (r: Recipe): CookStats => stats.get(r.id) ?? { count: 0, avg: 0 }
     let list = recipes.filter(
-      (r) => matchesSearch(r, query) && matchesProtein(r, filter) && inCalorieRange(r)
+      (r) =>
+        matchesSearch(r, query) &&
+        matchesProtein(r, filter) &&
+        inCalorieRange(r) &&
+        (cookbook === 'All' || sourceLabel(r.sourceFile) === cookbook)
     )
     if (cookedFilter !== 'all') {
       list = list.filter((r) => (statFor(r).count > 0) === (cookedFilter === 'cooked'))
@@ -70,9 +92,33 @@ export function Repository() {
       list = [...list].sort((a, b) => a.title.localeCompare(b.title))
     }
     return list
-  }, [recipes, query, filter, cookedFilter, calMin, calMax, sortKey, stats])
+  }, [recipes, query, filter, cookedFilter, calMin, calMax, cookbook, sortKey, stats])
 
   const hasRecipes = recipes.length > 0
+
+  // Active-filter bookkeeping for the collapsible filter panel.
+  const calorieActive = calMin !== null || calMax !== null
+  const calorieSummary =
+    calMin !== null && calMax !== null
+      ? `${calMin}–${calMax} cal`
+      : calMax !== null
+        ? `≤ ${calMax} cal`
+        : calMin !== null
+          ? `≥ ${calMin} cal`
+          : ''
+  const activeFilterCount =
+    (filter !== 'All' ? 1 : 0) +
+    (cookedFilter !== 'all' ? 1 : 0) +
+    (calorieActive ? 1 : 0) +
+    (cookbook !== 'All' ? 1 : 0)
+
+  const clearAllFilters = () => {
+    setFilter('All')
+    setCookedFilter('all')
+    setCalMin(null)
+    setCalMax(null)
+    setCookbook('All')
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
@@ -121,89 +167,31 @@ export function Repository() {
         />
       </div>
 
-      {/* Protein filter chips */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {PROTEIN_FILTERS.map((f) => {
-          const active = filter === f
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`chip ${
-                active
-                  ? 'border-herb-500 bg-herb-500 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-herb-300 hover:text-herb-700'
-              }`}
-            >
-              {f}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Calorie filter — an "All" toggle (orange when active) + a typed min–max range */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      {/* Filter toolbar: a single Filters button (with active count) + Sort */}
+      <div className="mb-3 flex items-center gap-2">
         <button
-          onClick={() => {
-            setCalMin(null)
-            setCalMax(null)
-          }}
-          className={`chip ${
-            calMin === null && calMax === null
-              ? 'border-orange-500 bg-orange-500 text-white shadow-sm'
-              : 'border-slate-200 bg-white text-slate-600 hover:border-orange-300 hover:text-orange-700'
-          }`}
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          className={`btn-secondary ${filtersOpen ? 'border-herb-400 text-herb-700' : ''}`}
         >
-          All
+          <FilterIcon width={18} height={18} />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-herb-500 px-1.5 text-xs font-bold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+          <ChevronDownIcon
+            width={16}
+            height={16}
+            className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+          />
         </button>
-        <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={calMin ?? ''}
-            onChange={(e) => setCalMin(e.target.value === '' ? null : Number(e.target.value))}
-            placeholder="min"
-            aria-label="Minimum calories"
-            className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-          />
-          <span className="text-slate-400">–</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={calMax ?? ''}
-            onChange={(e) => setCalMax(e.target.value === '' ? null : Number(e.target.value))}
-            placeholder="max"
-            aria-label="Maximum calories"
-            className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-          />
-          <span className="ml-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Calories
-          </span>
-        </div>
-      </div>
 
-      {/* Cooked filter + sort */}
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        {COOKED_FILTERS.map(({ id, label }) => {
-          const active = cookedFilter === id
-          return (
-            <button
-              key={id}
-              onClick={() => setCookedFilter(id)}
-              className={`chip ${
-                active
-                  ? 'border-slate-700 bg-slate-700 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800'
-              }`}
-            >
-              {label}
-            </button>
-          )
-        })}
         <label className="ml-auto flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sort</span>
+          <span className="hidden text-xs font-semibold uppercase tracking-wide text-slate-400 sm:inline">
+            Sort
+          </span>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
@@ -215,6 +203,135 @@ export function Repository() {
           </select>
         </label>
       </div>
+
+      {/* Active filters — visible at a glance, individually removable */}
+      {activeFilterCount > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {filter !== 'All' && (
+            <ActiveFilterChip label={filter} onClear={() => setFilter('All')} />
+          )}
+          {calorieActive && (
+            <ActiveFilterChip
+              label={calorieSummary}
+              onClear={() => {
+                setCalMin(null)
+                setCalMax(null)
+              }}
+            />
+          )}
+          {cookedFilter !== 'all' && (
+            <ActiveFilterChip
+              label={cookedFilter === 'cooked' ? 'Cooked' : 'Not cooked'}
+              onClear={() => setCookedFilter('all')}
+            />
+          )}
+          {cookbook !== 'All' && (
+            <ActiveFilterChip label={cookbook} onClear={() => setCookbook('All')} />
+          )}
+          <button
+            onClick={clearAllFilters}
+            className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Collapsible filter panel — grouped controls, stacks cleanly on mobile */}
+      {filtersOpen && (
+        <div className="mb-6 animate-slide-up space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <FilterGroup label="Protein">
+            {PROTEIN_FILTERS.map((f) => {
+              const active = filter === f
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`chip ${
+                    active
+                      ? 'border-herb-500 bg-herb-500 text-white shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-herb-300 hover:text-herb-700'
+                  }`}
+                >
+                  {f}
+                </button>
+              )
+            })}
+          </FilterGroup>
+
+          <FilterGroup label="Calories per serving">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={calMin ?? ''}
+                onChange={(e) => setCalMin(e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="min"
+                aria-label="Minimum calories"
+                className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              />
+              <span className="text-slate-400">–</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={calMax ?? ''}
+                onChange={(e) => setCalMax(e.target.value === '' ? null : Number(e.target.value))}
+                placeholder="max"
+                aria-label="Maximum calories"
+                className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              />
+              <span className="text-xs font-medium text-slate-400">cal · leave min blank for “under”</span>
+            </div>
+          </FilterGroup>
+
+          <FilterGroup label="Status">
+            {COOKED_FILTERS.map(({ id, label }) => {
+              const active = cookedFilter === id
+              return (
+                <button
+                  key={id}
+                  onClick={() => setCookedFilter(id)}
+                  className={`chip ${
+                    active
+                      ? 'border-slate-700 bg-slate-700 text-white shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </FilterGroup>
+
+          <FilterGroup label="Cookbook">
+            <select
+              value={cookbook}
+              onChange={(e) => setCookbook(e.target.value)}
+              className="tap-target w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-herb-400"
+            >
+              <option value="All">All cookbooks</option>
+              {cookbooks.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </FilterGroup>
+
+          {activeFilterCount > 0 && (
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={clearAllFilters}
+                className="text-sm font-semibold text-slate-500 hover:text-slate-700"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Grid / states */}
       {extracting && !hasRecipes ? (
@@ -229,6 +346,7 @@ export function Repository() {
             setCookedFilter('all')
             setCalMin(null)
             setCalMax(null)
+            setCookbook('All')
           }}
         />
       ) : (
@@ -256,6 +374,30 @@ export function Repository() {
         />
       )}
     </div>
+  )
+}
+
+function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
+    </div>
+  )
+}
+
+function ActiveFilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-herb-200 bg-herb-50 py-1 pl-3 pr-1 text-sm font-medium text-herb-700">
+      {label}
+      <button
+        onClick={onClear}
+        className="flex h-5 w-5 items-center justify-center rounded-full text-herb-500 transition-colors hover:bg-herb-100 hover:text-herb-800"
+        aria-label={`Remove ${label} filter`}
+      >
+        <CloseIcon width={13} height={13} />
+      </button>
+    </span>
   )
 }
 

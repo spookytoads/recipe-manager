@@ -182,6 +182,12 @@ export const DiceIcon = (p: IconProps) => (
   </svg>
 )
 
+export const FilterIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+)
+
 export const ListChecksIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="m3 7 2 2 4-4" />
