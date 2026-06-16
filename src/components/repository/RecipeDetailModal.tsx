@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import type { Recipe } from '../../types'
 import { useApp } from '../../context/AppContext'
-import { formatDate, formatMeasure, proteinLabel } from '../../lib/util'
-import { CalendarIcon, CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
+import { formatDate, formatMeasure, proteinLabel, sourceLabel } from '../../lib/util'
+import { BookIcon, CalendarIcon, CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
 import { Thumbnail } from './Thumbnail'
 import { hasNutrition, NutritionPanel } from './NutritionPanel'
 import { StarRating } from '../journal/StarRating'
@@ -125,6 +125,10 @@ export function RecipeDetailModal({
               {recipe.servingSize ? ` · ${recipe.servingSize}` : ''}
             </span>
           </div>
+
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+            <BookIcon width={14} height={14} /> {sourceLabel(recipe.sourceFile)}
+          </p>
 
           {(recipe.protein.length > 0 || recipe.tags.length > 0) && (
             <div className="mt-3 flex flex-wrap gap-1.5">

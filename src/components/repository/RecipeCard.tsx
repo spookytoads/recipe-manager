@@ -1,7 +1,7 @@
 import type { Recipe } from '../../types'
 import type { CookStats } from '../../lib/reviews'
-import { ClockIcon } from '../ui/icons'
-import { proteinLabel } from '../../lib/util'
+import { BookIcon, ClockIcon } from '../ui/icons'
+import { proteinLabel, sourceLabel } from '../../lib/util'
 import { Thumbnail } from './Thumbnail'
 
 export function RecipeCard({
@@ -69,6 +69,14 @@ export function RecipeCard({
             )
           )}
         </div>
+
+        <p
+          className="flex items-center gap-1 pt-0.5 text-[11px] text-slate-400"
+          title={sourceLabel(recipe.sourceFile)}
+        >
+          <BookIcon width={12} height={12} className="shrink-0" />
+          <span className="truncate">{sourceLabel(recipe.sourceFile)}</span>
+        </p>
       </div>
     </button>
   )

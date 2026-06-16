@@ -151,6 +151,10 @@ export function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
 
   const servingSize = String(r.servingSize ?? '').trim()
   const nutrition = asNutrition(r.nutrition)
+  // Keep the recipe's own source attribution when the data carries one (e.g.
+  // importing a cookbook JSON or restoring a backup); otherwise fall back to the
+  // file it's being read from now.
+  const rawSource = String(r.sourceFile ?? '').trim()
 
   return {
     id: uid('recipe'),
@@ -165,7 +169,7 @@ export function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
     steps: steps.sort((a, b) => a.order - b.order),
     tags,
     ...(nutrition ? { nutrition } : {}),
-    sourceFile,
+    sourceFile: rawSource || sourceFile,
   }
 }
 

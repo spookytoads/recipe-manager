@@ -96,6 +96,26 @@ export function formatMeasure(
   return main
 }
 
+/**
+ * Human-friendly label for where a recipe came from. Each recipe carries a
+ * `sourceFile`: a PDF/cookbook filename, a JSON import filename, or a sentinel
+ * for hand-entered / pasted recipes.
+ */
+export function sourceLabel(sourceFile: string | undefined): string {
+  const s = (sourceFile ?? '').trim()
+  if (!s || s === 'manual-entry') return 'Added manually'
+  if (s === 'pasted-text') return 'Pasted text'
+  // Strip the file extension, tidy separators, and drop our "- recipes" export suffix.
+  return (
+    s
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/_+/g, ' ')
+      .replace(/\s*-\s*recipes$/i, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim() || 'Added manually'
+  )
+}
+
 /** Today's local calendar date as 'YYYY-MM-DD' (for date inputs). */
 export function todayISO(): string {
   const now = new Date()
