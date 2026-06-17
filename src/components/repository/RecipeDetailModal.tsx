@@ -3,7 +3,7 @@ import type { Recipe } from '../../types'
 import { useApp } from '../../context/AppContext'
 import { formatDate, formatMeasure, proteinLabel, sourceLabel } from '../../lib/util'
 import { BookIcon, CalendarIcon, CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
-import { Thumbnail } from './Thumbnail'
+import { recipeColor } from '../../lib/colors'
 import { hasNutrition, NutritionPanel } from './NutritionPanel'
 import { StarRating } from '../journal/StarRating'
 import { reviewsForRecipe } from '../../lib/reviews'
@@ -73,27 +73,28 @@ export function RecipeDetailModal({
       aria-label={recipe.title}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-cream shadow-2xl sm:rounded-3xl"
+        className="relative flex max-h-[92vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-cream shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="relative shrink-0">
-          <Thumbnail seed={recipe.id} label={recipe.title} className="h-32 w-full sm:h-40" />
-          <button
-            onClick={onClose}
-            className="tap-target absolute right-3 top-3 flex items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm transition-colors hover:bg-white"
-            aria-label="Close"
-          >
-            <CloseIcon />
-          </button>
-        </div>
+        {/* Color splash line */}
+        <div
+          className="h-2 w-full shrink-0"
+          style={{ backgroundColor: recipeColor(recipe.title).accent }}
+        />
+        <button
+          onClick={onClose}
+          className="tap-target absolute right-3 top-4 z-10 flex items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm transition-colors hover:bg-white"
+          aria-label="Close"
+        >
+          <CloseIcon />
+        </button>
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-7">
           <p className="text-xs font-semibold uppercase tracking-wide text-herb-600">
             {recipe.cuisine}
           </p>
-          <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-slate-800">
+          <h2 className="mt-0.5 pr-10 text-2xl font-extrabold tracking-tight text-slate-800">
             {recipe.title}
           </h2>
 

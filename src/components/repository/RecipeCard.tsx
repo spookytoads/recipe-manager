@@ -2,7 +2,7 @@ import type { Recipe } from '../../types'
 import type { CookStats } from '../../lib/reviews'
 import { BookIcon, ClockIcon } from '../ui/icons'
 import { proteinLabel, sourceLabel } from '../../lib/util'
-import { Thumbnail } from './Thumbnail'
+import { recipeColor } from '../../lib/colors'
 
 export function RecipeCard({
   recipe,
@@ -18,7 +18,7 @@ export function RecipeCard({
       onClick={onClick}
       className="card group flex flex-col overflow-hidden text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-herb-400"
     >
-      <Thumbnail seed={recipe.id} label={recipe.title} className="h-36 w-full" />
+      <div className="h-1.5 w-full" style={{ backgroundColor: recipeColor(recipe.title).accent }} />
 
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
@@ -85,7 +85,7 @@ export function RecipeCard({
 export function RecipeCardSkeleton() {
   return (
     <div className="card overflow-hidden">
-      <div className="h-36 w-full animate-pulse bg-slate-200" />
+      <div className="h-1.5 w-full bg-slate-200" />
       <div className="flex flex-col gap-3 p-4">
         <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200" />
         <div className="h-3 w-1/3 animate-pulse rounded bg-slate-200" />
