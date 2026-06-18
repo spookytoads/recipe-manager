@@ -1,4 +1,25 @@
-import type { ProteinFilter, Recipe } from '../types'
+import type { Ingredient, ProteinFilter, Recipe } from '../types'
+
+/**
+ * Split a recipe's ingredients into ordered component groups (e.g. "Marinade",
+ * "Sauce"). Ingredients with no group fall under `group: null`. Returns a single
+ * `null` group when the recipe has no component sections at all.
+ */
+export function groupIngredients(
+  ingredients: Ingredient[]
+): { group: string | null; items: Ingredient[] }[] {
+  const order: (string | null)[] = []
+  const map = new Map<string | null, Ingredient[]>()
+  for (const ing of ingredients) {
+    const g = ing.group?.trim() || null
+    if (!map.has(g)) {
+      map.set(g, [])
+      order.push(g)
+    }
+    map.get(g)!.push(ing)
+  }
+  return order.map((g) => ({ group: g, items: map.get(g)! }))
+}
 
 let counter = 0
 /** Reasonably unique id without pulling in a uuid dependency. */

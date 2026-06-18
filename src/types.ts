@@ -23,6 +23,8 @@ export interface Ingredient {
   quantity: number
   unit: string
   category: Category
+  /** Optional recipe component this ingredient belongs to, e.g. "Sauce", "Marinade". */
+  group?: string
   /** Optional second measurement the recipe lists, e.g. "200 g (1 cup)" → alt = 1 cup. */
   altQuantity?: number
   altUnit?: string

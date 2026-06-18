@@ -20,7 +20,7 @@ const MAX_TOKENS = 60000
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 const SYSTEM_PROMPT =
-  'You are a recipe extraction assistant. The input (a PDF or pasted text) may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, servingSize, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category, altQuantity, altUnit }], steps: [{ id, order, instruction, timerSeconds }], tags[], nutrition: { calories, protein, carbs, fat, fiber, sugar, sodium } }. If the input contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. Preserve each ingredient\'s unit exactly as written (g, cups, tbsp, tsp, oz, etc.). IMPORTANT: when an ingredient lists TWO measurements (e.g. "200 g (1 cup)" or "2 tbsp (30 g)"), put the first as quantity+unit and the SECOND as altQuantity+altUnit — capture both exactly as printed; never convert or compute a second measurement yourself, and omit altQuantity/altUnit when the recipe only gives one measurement. For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other. For servingSize, copy the recipe\'s stated serving description (e.g. "1 cup (240g)") if given, else omit it. CRITICAL: include the "nutrition" object ONLY if the recipe explicitly prints nutrition facts — NEVER estimate, calculate, or invent nutrition values. If no nutrition information is printed, omit the nutrition field entirely. Nutrition is PER SERVING: calories in kcal; protein, carbs, fat, fiber, sugar in grams; sodium in milligrams.'
+  'You are a recipe extraction assistant. The input (a PDF or pasted text) may contain ONE recipe or MANY recipes (e.g. a cookbook or a multi-page collection). Extract EVERY distinct recipe you find. Return ONLY a valid JSON object with no markdown and no explanation, of the form { "recipes": [ ... ] }, where each element of the array matches this exact structure: { title, cuisine, protein[], servings, servingSize, cookTime, prepTime, ingredients: [{ id, name, quantity, unit, category, group, altQuantity, altUnit }], steps: [{ id, order, instruction, timerSeconds }], tags[], nutrition: { calories, protein, carbs, fat, fiber, sugar, sodium } }. If the input contains a single recipe, return an array with exactly one element. Keep recipes separate — never merge ingredients or steps from different recipes. Preserve each ingredient\'s unit exactly as written (g, cups, tbsp, tsp, oz, etc.). IMPORTANT: when an ingredient lists TWO measurements (e.g. "200 g (1 cup)" or "2 tbsp (30 g)"), put the first as quantity+unit and the SECOND as altQuantity+altUnit — capture both exactly as printed; never convert or compute a second measurement yourself, and omit altQuantity/altUnit when the recipe only gives one measurement. For protein, identify all primary proteins present. For ingredient category, classify as one of: Produce, Proteins, Dairy, Pantry, Spices, Beverages, Other. For ingredient "group", copy the recipe\'s component/section heading the ingredient is listed under (e.g. "Marinade", "Sauce", "Pasta", "Aromatics"); omit group entirely when the recipe doesn\'t split ingredients into sections. For servingSize, copy the recipe\'s stated serving description (e.g. "1 cup (240g)") if given, else omit it. CRITICAL: include the "nutrition" object ONLY if the recipe explicitly prints nutrition facts — NEVER estimate, calculate, or invent nutrition values. If no nutrition information is printed, omit the nutrition field entirely. Nutrition is PER SERVING: calories in kcal; protein, carbs, fat, fiber, sugar in grams; sodium in milligrams.'
 
 export class RecipeExtractionError extends Error {}
 
@@ -118,12 +118,14 @@ export function normalizeRecipe(raw: unknown, sourceFile: string): Recipe {
     const altQuantity = asNumber(i.altQuantity, NaN)
     const altUnit = String(i.altUnit ?? '').trim()
     const hasAlt = isFinite(altQuantity) && altQuantity > 0 && !!altUnit
+    const group = String(i.group ?? '').trim()
     return {
       id: typeof i.id === 'string' && i.id ? i.id : uid('ing'),
       name: String(i.name ?? '').trim() || 'Unnamed ingredient',
       quantity: asNumber(i.quantity, 1),
       unit: String(i.unit ?? '').trim(),
       category: asCategory(i.category),
+      ...(group ? { group } : {}),
       ...(hasAlt ? { altQuantity, altUnit } : {}),
     }
   })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import type { Recipe } from '../../types'
 import { useApp } from '../../context/AppContext'
-import { formatDate, formatMeasure, proteinLabel, sourceLabel } from '../../lib/util'
+import { formatDate, formatMeasure, groupIngredients, proteinLabel, sourceLabel } from '../../lib/util'
 import {
   BookIcon,
   CalendarIcon,
@@ -181,16 +181,27 @@ export function RecipeDetailModal({
             <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-pumpkin-ink">
               Ingredients
             </h3>
-            <ul className="divide-y divide-royal/10 rounded-xl border border-royal/15 bg-white">
-              {recipe.ingredients.map((ing) => (
-                <li key={ing.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
-                  <span className="text-royal-ink">{ing.name}</span>
-                  <span className="shrink-0 text-right text-sm font-semibold text-royal-soft">
-                    {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit)}
-                  </span>
-                </li>
+            <div className="overflow-hidden rounded-xl border border-royal/15 bg-white">
+              {groupIngredients(recipe.ingredients).map(({ group, items }, gi) => (
+                <div key={group ?? gi} className={gi > 0 ? 'border-t border-royal/10' : ''}>
+                  {group && (
+                    <div className="bg-royal/5 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-royal">
+                      {group}
+                    </div>
+                  )}
+                  <ul className="divide-y divide-royal/10">
+                    {items.map((ing) => (
+                      <li key={ing.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+                        <span className="text-royal-ink">{ing.name}</span>
+                        <span className="shrink-0 text-right text-sm font-semibold text-royal-soft">
+                          {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           </section>
 
           {/* Steps */}

@@ -14,6 +14,7 @@ interface IngRow {
   altQuantity: string
   altUnit: string
   category: Category
+  group: string
 }
 
 interface StepRow {
@@ -30,6 +31,7 @@ const emptyIng = (): IngRow => ({
   altQuantity: '',
   altUnit: '',
   category: 'Other',
+  group: '',
 })
 const emptyStep = (): StepRow => ({ key: uid('row'), instruction: '', minutes: '' })
 
@@ -102,6 +104,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
             altQuantity: typeof i.altQuantity === 'number' ? String(i.altQuantity) : '',
             altUnit: i.altUnit ?? '',
             category: i.category,
+            group: i.group ?? '',
           }))
         : [emptyIng()]
     )
@@ -173,6 +176,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
             quantity: Number(i.quantity) || 0,
             unit: i.unit.trim(),
             category: i.category,
+            ...(i.group.trim() ? { group: i.group.trim() } : {}),
             ...(hasAlt ? { altQuantity: altQ, altUnit: i.altUnit.trim() } : {}),
           }
         }),
@@ -399,6 +403,15 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
                       </option>
                     ))}
                   </select>
+                  <input
+                    value={row.group}
+                    onChange={(e) =>
+                      setIngredients((prev) => prev.map((r) => (r.key === row.key ? { ...r, group: e.target.value } : r)))
+                    }
+                    placeholder="Group"
+                    title="Optional component, e.g. Sauce or Marinade"
+                    className={`${inputClass} w-24`}
+                  />
                   <button
                     onClick={() => setIngredients((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== row.key) : prev))}
                     className="tap-target flex shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500"

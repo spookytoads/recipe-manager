@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { formatMeasure, proteinLabel } from '../../lib/util'
+import { formatMeasure, groupIngredients, proteinLabel } from '../../lib/util'
 import { CheckIcon, ChefIcon, ChevronDownIcon, ClockIcon, CloseIcon, JournalIcon } from '../ui/icons'
 import { Timer } from './Timer'
 import { CookLogModal } from '../journal/CookLogModal'
@@ -163,41 +163,52 @@ export function Cook() {
               {progress.checkedIngredients.length}/{recipe.ingredients.length} prepped
             </span>
           </div>
-          <ul className="divide-y divide-royal/10">
-            {recipe.ingredients.map((ing) => {
-              const checked = progress.checkedIngredients.includes(ing.id)
-              return (
-                <li key={ing.id}>
-                  <button
-                    onClick={() => toggleCookIngredient(recipe.id, ing.id)}
-                    className="tap-target flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-royal/5"
-                  >
-                    <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                        checked ? 'border-pumpkin bg-pumpkin text-white' : 'border-royal/30 bg-white'
-                      }`}
-                    >
-                      {checked && <CheckIcon width={16} height={16} />}
-                    </span>
-                    <span
-                      className={`flex-1 transition-colors ${
-                        checked ? 'text-royal-faint line-through' : 'text-royal-ink'
-                      }`}
-                    >
-                      {ing.name}
-                    </span>
-                    <span
-                      className={`shrink-0 text-sm font-bold tabular-nums transition-colors ${
-                        checked ? 'text-royal-faint' : 'text-royal-soft'
-                      }`}
-                    >
-                      {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit, scale)}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <div>
+            {groupIngredients(recipe.ingredients).map(({ group, items }, gi) => (
+              <div key={group ?? gi} className={gi > 0 ? 'border-t border-royal/10' : ''}>
+                {group && (
+                  <div className="bg-royal/5 px-5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-royal">
+                    {group}
+                  </div>
+                )}
+                <ul className="divide-y divide-royal/10">
+                  {items.map((ing) => {
+                    const checked = progress.checkedIngredients.includes(ing.id)
+                    return (
+                      <li key={ing.id}>
+                        <button
+                          onClick={() => toggleCookIngredient(recipe.id, ing.id)}
+                          className="tap-target flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-royal/5"
+                        >
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                              checked ? 'border-pumpkin bg-pumpkin text-white' : 'border-royal/30 bg-white'
+                            }`}
+                          >
+                            {checked && <CheckIcon width={16} height={16} />}
+                          </span>
+                          <span
+                            className={`flex-1 transition-colors ${
+                              checked ? 'text-royal-faint line-through' : 'text-royal-ink'
+                            }`}
+                          >
+                            {ing.name}
+                          </span>
+                          <span
+                            className={`shrink-0 text-sm font-bold tabular-nums transition-colors ${
+                              checked ? 'text-royal-faint' : 'text-royal-soft'
+                            }`}
+                          >
+                            {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit, scale)}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Steps */}
