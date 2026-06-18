@@ -98,18 +98,18 @@ export function Shopping() {
   if (totalCount === 0) {
     return (
       <div className="mx-auto max-w-3xl px-3 py-5 sm:px-6 sm:py-8">
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 sm:text-3xl">
-          Shopping List
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-choc sm:text-4xl">
+          shopping list
         </h1>
-        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center">
-          <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-herb-50 text-herb-500">
+        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-choc/25 bg-white/5 px-6 py-16 text-center">
+          <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-choc">
             <CartIcon width={32} height={32} />
           </span>
-          <h2 className="text-lg font-bold text-slate-800">Your shopping list is empty</h2>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">
+          <h2 className="text-lg font-bold text-choc">Your shopping list is empty</h2>
+          <p className="mt-1 max-w-xs text-sm text-royal-mute">
             Open a recipe and tap “Add to Shopping List” to start building your grocery run.
           </p>
-          <button onClick={() => setSection('repository')} className="btn-primary mt-4">
+          <button onClick={() => setSection('repository')} className="btn-line mt-4">
             Browse recipes
           </button>
         </div>
@@ -164,28 +164,28 @@ export function Shopping() {
     <div className="mx-auto max-w-3xl px-3 py-5 sm:px-6 sm:py-8">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 sm:text-3xl">
-            Shopping List
+          <h1 className="font-serif text-3xl font-medium tracking-tight text-choc sm:text-4xl">
+            shopping list
           </h1>
-          <p className="mt-1 text-sm font-medium text-slate-500">
+          <p className="mt-1 text-sm font-medium text-royal-mute">
             {totalCount} {totalCount === 1 ? 'item' : 'items'} · {remaining} remaining
           </p>
         </div>
 
         {/* Servings multiplier */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span className="text-xs font-semibold uppercase tracking-wide text-royal-mute">
             Scale
           </span>
-          <div className="flex rounded-xl border border-slate-200 bg-white p-1">
+          <div className="flex rounded-xl border border-white/15 bg-white/10 p-1">
             {MULTIPLIERS.map((m) => (
               <button
                 key={m}
                 onClick={() => setMultiplier(m)}
                 className={`tap-target rounded-lg px-3 text-sm font-bold transition-colors ${
                   multiplier === m
-                    ? 'bg-herb-500 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100'
+                    ? 'bg-pumpkin text-white shadow-sm'
+                    : 'text-royal-mute hover:bg-white/10 hover:text-choc'
                 }`}
               >
                 {m}×
@@ -197,27 +197,27 @@ export function Shopping() {
 
       {/* Controls */}
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <div className="mr-auto h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+        <div className="mr-auto h-2 flex-1 overflow-hidden rounded-full bg-white/15">
           <div
-            className="h-full rounded-full bg-herb-500 transition-all duration-300"
+            className="h-full rounded-full bg-junebud transition-all duration-300"
             style={{ width: `${totalCount ? (checkedCount / totalCount) * 100 : 0}%` }}
           />
         </div>
         <button
           onClick={handleExportToNotes}
-          className="btn-secondary"
+          className="btn-line"
           title="Export to Apple Notes as a checklist"
         >
-          <ListChecksIcon width={16} height={16} /> Apple Notes
+          <ListChecksIcon width={16} height={16} className="text-pumpkin" /> Apple Notes
         </button>
         <button
           onClick={clearChecked}
           disabled={checkedCount === 0}
-          className="btn-secondary"
+          className="btn-line"
         >
           Clear Checked
         </button>
-        <button onClick={clearAllShopping} className="btn-ghost text-red-500 hover:bg-red-50">
+        <button onClick={clearAllShopping} className="btn-ghost text-red-300 hover:bg-white/10 hover:text-red-200">
           Clear All
         </button>
       </div>
@@ -225,7 +225,7 @@ export function Shopping() {
       {/* Recipes contributing to this list — remove one if you change your mind */}
       {sourceRecipes.length > 0 && (
         <div className="mb-5">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-royal-mute">
             From {sourceRecipes.length} {sourceRecipes.length === 1 ? 'recipe' : 'recipes'}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -266,26 +266,26 @@ export function Shopping() {
           const items = grouped.get(category)!
           return (
             <section key={category}>
-              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-choc">
                 {category}
-                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-bold text-choc">
                   {items.length}
                 </span>
               </h2>
-              <ul className="card divide-y divide-slate-200/70 overflow-hidden">
+              <ul className="card divide-y divide-royal/10 overflow-hidden">
                 {items.map((item) => {
                   const checked = checkedKeys.includes(item.key)
                   return (
                     <li key={item.key}>
                       <button
                         onClick={() => toggleChecked(item.key)}
-                        className="tap-target flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                        className="tap-target flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-royal/5"
                       >
                         <span
                           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
                             checked
-                              ? 'border-herb-500 bg-herb-500 text-white'
-                              : 'border-slate-300 bg-white'
+                              ? 'border-pumpkin bg-pumpkin text-white'
+                              : 'border-royal/30 bg-white'
                           }`}
                         >
                           {checked && <CheckIcon width={16} height={16} />}
@@ -294,7 +294,7 @@ export function Shopping() {
                         <div className="min-w-0 flex-1">
                           <p
                             className={`font-medium transition-colors ${
-                              checked ? 'text-slate-400 line-through' : 'text-slate-800'
+                              checked ? 'text-royal-faint line-through' : 'text-royal-ink'
                             }`}
                           >
                             {item.name}
@@ -321,7 +321,7 @@ export function Shopping() {
 
                         <span
                           className={`shrink-0 text-sm font-bold tabular-nums transition-colors ${
-                            checked ? 'text-slate-300' : 'text-slate-600'
+                            checked ? 'text-royal-faint' : 'text-royal-soft'
                           }`}
                         >
                           {formatMeasure(

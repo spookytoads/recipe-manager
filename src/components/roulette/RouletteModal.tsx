@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext'
 import { PROTEIN_FILTERS, type ProteinFilter, type Recipe } from '../../types'
 import { matchesProtein, proteinLabel } from '../../lib/util'
 import { recipeColor } from '../../lib/colors'
-import { Thumbnail } from '../repository/Thumbnail'
 import { ChefIcon, ClockIcon, CloseIcon, DiceIcon } from '../ui/icons'
 
 const ROLL_MS = 1300
@@ -136,22 +135,22 @@ export function RouletteModal({
       aria-label="Weeknight Roulette"
     >
       <div
-        className="flex max-h-[94vh] w-full max-w-lg animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-cream shadow-2xl sm:rounded-3xl"
+        className="flex max-h-[94vh] w-full max-w-lg animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-choc shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-200/70 bg-white px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-royal/10 bg-white px-5 py-3.5">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-herb-500 text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-pumpkin text-white">
               <DiceIcon width={18} height={18} />
             </span>
-            <h2 className="text-lg font-extrabold tracking-tight text-slate-800">
-              Weeknight Roulette
+            <h2 className="font-serif text-lg font-medium tracking-tight text-royal-ink">
+              feeling frisky?
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="tap-target flex items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="tap-target flex items-center justify-center rounded-full text-royal-faint transition-colors hover:bg-royal/5 hover:text-royal"
             aria-label="Close"
           >
             <CloseIcon />
@@ -160,7 +159,7 @@ export function RouletteModal({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <p className="mb-1 text-center text-sm font-semibold text-slate-700">
+          <p className="mb-1 text-center text-sm font-semibold text-royal-soft">
             1. Pick a protein
           </p>
           <div className="mb-5 flex flex-wrap justify-center gap-2">
@@ -173,8 +172,8 @@ export function RouletteModal({
                   disabled={rolling}
                   className={`chip !min-h-0 !min-w-0 px-3 py-1.5 text-xs ${
                     active
-                      ? 'border-herb-500 bg-herb-500 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-herb-300 hover:text-herb-700'
+                      ? 'border-royal bg-royal text-white shadow-sm'
+                      : 'border-royal/25 bg-white text-royal-soft hover:border-royal/50 hover:text-royal-ink'
                   } ${rolling ? 'cursor-not-allowed opacity-60' : ''}`}
                 >
                   {f}
@@ -183,7 +182,7 @@ export function RouletteModal({
             })}
           </div>
 
-          <p className="mb-2 text-center text-sm font-semibold text-slate-700">
+          <p className="mb-2 text-center text-sm font-semibold text-royal-soft">
             2. Roll the dice
           </p>
 
@@ -226,7 +225,7 @@ export function RouletteModal({
             </button>
 
             {!canRoll && (
-              <p className="mt-4 text-center text-sm text-slate-500">
+              <p className="mt-4 text-center text-sm text-royal-soft">
                 No {protein === 'All' ? '' : `${protein.toLowerCase()} `}recipes in your library yet.
               </p>
             )}
@@ -235,7 +234,7 @@ export function RouletteModal({
           {/* Results */}
           {results && results.length > 0 && (
             <section className="mt-6">
-              <h3 className="mb-3 text-center text-sm font-bold uppercase tracking-wide text-slate-500">
+              <h3 className="mb-3 text-center text-sm font-bold uppercase tracking-wide text-pumpkin-ink">
                 Tonight's picks
               </h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -248,24 +247,18 @@ export function RouletteModal({
                         e.stopPropagation()
                         onPick(r)
                       }}
-                      className="card animate-slide-up overflow-hidden text-left transition-transform hover:-translate-y-0.5 hover:shadow-md"
+                      className="animate-slide-up overflow-hidden rounded-lg bg-white text-left shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg"
                       style={{ animationDelay: `${i * 110}ms`, animationFillMode: 'backwards' }}
                     >
-                      <div className="relative">
-                        <Thumbnail seed={r.id} label={r.title} className="h-20 w-full" />
-                        <span
-                          className="absolute left-0 top-0 h-full w-1.5"
-                          style={{ backgroundColor: color.accent }}
-                        />
-                      </div>
+                      <div className="h-1.5 w-full" style={{ backgroundColor: color.accent }} />
                       <div className="p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-herb-600">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-royal-faint">
                           {r.cuisine}
                         </p>
-                        <h4 className="mt-0.5 line-clamp-2 font-bold leading-snug text-slate-800">
+                        <h4 className="mt-0.5 line-clamp-2 font-serif text-base font-medium leading-snug text-royal-ink">
                           {r.title}
                         </h4>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-royal-soft">
                           <span className="inline-flex items-center gap-1">
                             <ClockIcon width={13} height={13} /> {r.cookTime}
                           </span>
@@ -273,7 +266,7 @@ export function RouletteModal({
                             <ChefIcon width={13} height={13} /> {r.servings}
                           </span>
                           {typeof r.nutrition?.calories === 'number' && (
-                            <span className="font-semibold text-slate-600">
+                            <span className="font-semibold text-pumpkin-ink">
                               {r.nutrition.calories} cal
                             </span>
                           )}
@@ -283,7 +276,7 @@ export function RouletteModal({
                             {r.protein.map((p) => (
                               <span
                                 key={p}
-                                className="rounded-full bg-herb-100 px-2 py-0.5 text-[10px] font-semibold text-herb-700"
+                                className="rounded-md bg-junebud px-2 py-0.5 text-[10px] font-semibold text-royal-ink"
                               >
                                 {proteinLabel(p)}
                               </span>
@@ -295,7 +288,7 @@ export function RouletteModal({
                   )
                 })}
               </div>
-              <p className="mt-3 text-center text-xs text-slate-400">
+              <p className="mt-3 text-center text-xs text-royal-faint">
                 Tap a card for the full recipe.
               </p>
             </section>

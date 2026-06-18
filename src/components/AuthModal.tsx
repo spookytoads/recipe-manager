@@ -26,7 +26,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   }, [onClose])
 
   const inputClass =
-    'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-herb-400 focus:ring-2 focus:ring-herb-100'
+    'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-pumpkin focus:ring-2 focus:ring-pumpkin/20'
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -74,12 +74,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     >
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className="w-full max-w-md animate-slide-up rounded-3xl bg-cream p-5 shadow-2xl sm:p-6"
+          className="w-full max-w-md animate-slide-up rounded-3xl bg-choc p-5 shadow-2xl sm:p-6"
           onClick={(e) => e.stopPropagation()}
         >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-herb-100 text-herb-600">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pumpkin/15 text-pumpkin-ink">
               <CloudIcon width={20} height={20} />
             </span>
             <div>
@@ -102,7 +102,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
 
         {user ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 rounded-xl border border-herb-200 bg-herb-50 px-3 py-2.5 text-sm text-herb-800">
+            <div className="flex items-center gap-2 rounded-xl border border-royal/20 bg-royal/5 px-3 py-2.5 text-sm text-royal-ink">
               <CheckIcon width={18} height={18} className="shrink-0" />
               <span className="min-w-0 flex-1 truncate">{user.email}</span>
               <SyncBadge status={syncStatus} />
@@ -144,7 +144,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             </label>
 
             {info && (
-              <div className="flex items-start gap-2 rounded-lg border border-herb-200 bg-herb-50 px-3 py-2 text-sm text-herb-800">
+              <div className="flex items-start gap-2 rounded-lg border border-royal/20 bg-royal/5 px-3 py-2 text-sm text-royal-ink">
                 <CheckIcon width={16} height={16} className="mt-0.5 shrink-0" />
                 <span>{info}</span>
               </div>
@@ -170,7 +170,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                   setError(null)
                   setInfo(null)
                 }}
-                className="font-semibold text-herb-600 hover:underline"
+                className="font-semibold text-royal hover:underline"
               >
                 {mode === 'signup' ? 'Sign in' : 'Create one'}
               </button>
@@ -195,6 +195,6 @@ function SyncBadge({ status }: { status: string }) {
           : ''
   if (!label) return null
   const tone =
-    status === 'error' ? 'bg-red-100 text-red-700' : 'bg-white text-herb-700 border border-herb-200'
+    status === 'error' ? 'bg-red-100 text-red-700' : 'bg-white text-royal border border-royal/20'
   return <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone}`}>{label}</span>
 }

@@ -90,16 +90,16 @@ export function Timer({ seconds }: { seconds: number }) {
   const offset = CIRCUMFERENCE * (1 - progress)
 
   return (
-    <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <div className="mt-3 flex items-center gap-3 rounded-xl border border-royal/10 bg-royal/5 p-3">
       <div className="relative h-[84px] w-[84px] shrink-0">
         <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">
-          <circle cx="42" cy="42" r={RADIUS} fill="none" stroke="#e2e8f0" strokeWidth="6" />
+          <circle cx="42" cy="42" r={RADIUS} fill="none" stroke="#E5E2F2" strokeWidth="6" />
           <circle
             cx="42"
             cy="42"
             r={RADIUS}
             fill="none"
-            stroke={done ? '#3d8540' : '#5ba15e'}
+            stroke={done ? '#2C20D4' : '#FF5E33'}
             strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
@@ -109,7 +109,7 @@ export function Timer({ seconds }: { seconds: number }) {
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span
-            className={`text-sm font-bold tabular-nums ${done ? 'text-herb-600' : 'text-slate-700'}`}
+            className={`text-sm font-bold tabular-nums ${done ? 'text-royal' : 'text-royal-soft'}`}
           >
             {done ? 'Done!' : formatClock(remaining)}
           </span>

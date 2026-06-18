@@ -12,7 +12,7 @@ export function Toaster() {
             ? 'border-red-200 bg-red-50 text-red-800'
             : t.type === 'info'
               ? 'border-slate-200 bg-white text-slate-800'
-              : 'border-herb-200 bg-herb-50 text-herb-800'
+              : 'border-royal/20 bg-white text-royal-ink'
         return (
           <div
             key={t.id}

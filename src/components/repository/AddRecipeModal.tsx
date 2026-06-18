@@ -34,7 +34,7 @@ const emptyIng = (): IngRow => ({
 const emptyStep = (): StepRow => ({ key: uid('row'), instruction: '', minutes: '' })
 
 const inputClass =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-herb-400 focus:ring-2 focus:ring-herb-100'
+  'w-full rounded-xl border border-royal/20 bg-white px-3 py-2.5 text-royal-ink outline-none transition-colors placeholder:text-royal-faint focus:border-pumpkin focus:ring-2 focus:ring-pumpkin/20'
 
 export function AddRecipeModal({ onClose }: { onClose: () => void }) {
   const { addRecipe, pushToast } = useApp()
@@ -205,7 +205,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
       aria-label="Add a recipe"
     >
       <div
-        className="flex max-h-[94vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-cream shadow-2xl sm:rounded-3xl"
+        className="flex max-h-[94vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-choc shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -223,9 +223,9 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
         {/* Body */}
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4 sm:px-6">
           {/* Paste & parse */}
-          <section className="rounded-2xl border border-herb-200 bg-herb-50/60 p-4">
-            <h3 className="text-sm font-bold text-herb-800">Paste a recipe & auto-fill</h3>
-            <p className="mt-0.5 text-xs text-herb-700/80">
+          <section className="rounded-2xl border border-royal/20 bg-royal/5 p-4">
+            <h3 className="text-sm font-bold text-royal-ink">Paste a recipe & auto-fill</h3>
+            <p className="mt-0.5 text-xs text-royal-soft">
               Copy a recipe from anywhere, paste it here, and let AI fill in the fields below. Or
               skip this and type it in manually.
             </p>
@@ -409,7 +409,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-            <button onClick={() => setIngredients((prev) => [...prev, emptyIng()])} className="btn-ghost mt-2 text-sm text-herb-700">
+            <button onClick={() => setIngredients((prev) => [...prev, emptyIng()])} className="btn-ghost mt-2 text-sm text-royal">
               <PlusIcon width={16} height={16} /> Add ingredient
             </button>
           </section>
@@ -420,7 +420,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
             <div className="space-y-2">
               {steps.map((row, idx) => (
                 <div key={row.key} className="flex items-start gap-2">
-                  <span className="mt-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-herb-500 text-sm font-bold text-white">
+                  <span className="mt-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pumpkin text-sm font-bold text-white">
                     {idx + 1}
                   </span>
                   <textarea
@@ -453,7 +453,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-            <button onClick={() => setSteps((prev) => [...prev, emptyStep()])} className="btn-ghost mt-2 text-sm text-herb-700">
+            <button onClick={() => setSteps((prev) => [...prev, emptyStep()])} className="btn-ghost mt-2 text-sm text-royal">
               <PlusIcon width={16} height={16} /> Add step
             </button>
           </section>

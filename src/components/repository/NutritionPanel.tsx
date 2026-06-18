@@ -45,7 +45,7 @@ export function NutritionPanel({
                 {label}
               </div>
               {showTotal && (
-                <div className="mt-0.5 text-[11px] text-herb-600">
+                <div className="mt-0.5 text-[11px] text-pumpkin-ink">
                   {formatQuantity(value * multiplier)}
                   {unit ? ` ${unit}` : ''} total
                 </div>

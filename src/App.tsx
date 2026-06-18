@@ -18,22 +18,14 @@ function Sections() {
   )
 }
 
-function Shell() {
-  const { section } = useApp()
-  // The Repository wears the royal-blue theme; the other tabs stay on cream for now.
-  return (
-    <div className={`min-h-full ${section === 'repository' ? 'bg-royal' : 'bg-cream'}`}>
-      <NavBar />
-      <Sections />
-      <Toaster />
-    </div>
-  )
-}
-
 export default function App() {
   return (
     <AppProvider>
-      <Shell />
+      <div className="min-h-full bg-royal">
+        <NavBar />
+        <Sections />
+        <Toaster />
+      </div>
     </AppProvider>
   )
 }
