@@ -2,8 +2,18 @@ import { useEffect, useMemo } from 'react'
 import type { Recipe } from '../../types'
 import { useApp } from '../../context/AppContext'
 import { formatDate, formatMeasure, proteinLabel, sourceLabel } from '../../lib/util'
-import { BookIcon, CalendarIcon, CartIcon, ChefIcon, ClockIcon, CloseIcon, TrashIcon } from '../ui/icons'
+import {
+  BookIcon,
+  CalendarIcon,
+  CartIcon,
+  ChefIcon,
+  ClockIcon,
+  CloseIcon,
+  DownloadIcon,
+  TrashIcon,
+} from '../ui/icons'
 import { recipeColor } from '../../lib/colors'
+import { exportRecipePdf } from '../../lib/exportPdf'
 import { hasNutrition, NutritionPanel } from './NutritionPanel'
 import { StarRating } from '../journal/StarRating'
 import { reviewsForRecipe } from '../../lib/reviews'
@@ -53,6 +63,13 @@ export function RecipeDetailModal({
     onClose()
   }
 
+  const handleExportPdf = () => {
+    const ok = exportRecipePdf(recipe)
+    if (!ok) {
+      pushToast('Allow pop-ups for this site to export a PDF', 'error')
+    }
+  }
+
   const handleDelete = () => {
     if (recipe.id.startsWith('seed-')) {
       if (!window.confirm('Delete this sample recipe? It will be removed from your library.')) return
@@ -73,7 +90,7 @@ export function RecipeDetailModal({
       aria-label={recipe.title}
     >
       <div
-        className="relative flex max-h-[92vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-cream shadow-2xl sm:rounded-3xl"
+        className="relative flex max-h-[92vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-choc shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Color splash line */}
@@ -83,7 +100,7 @@ export function RecipeDetailModal({
         />
         <button
           onClick={onClose}
-          className="tap-target absolute right-3 top-4 z-10 flex items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm transition-colors hover:bg-white"
+          className="tap-target absolute right-3 top-4 z-10 flex items-center justify-center rounded-full bg-white/90 text-royal shadow-sm transition-colors hover:bg-white"
           aria-label="Close"
         >
           <CloseIcon />
@@ -91,10 +108,10 @@ export function RecipeDetailModal({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-7">
-          <p className="text-xs font-semibold uppercase tracking-wide text-herb-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-royal-faint">
             {recipe.cuisine}
           </p>
-          <h2 className="mt-0.5 pr-10 text-2xl font-extrabold tracking-tight text-slate-800">
+          <h2 className="mt-0.5 pr-10 font-serif text-2xl font-medium tracking-tight text-royal-ink">
             {recipe.title}
           </h2>
 
@@ -103,10 +120,10 @@ export function RecipeDetailModal({
               {avgRating > 0 && (
                 <>
                   <StarRating value={Math.round(avgRating)} size={18} />
-                  <span className="text-sm font-bold text-slate-700">{avgRating.toFixed(1)}</span>
+                  <span className="text-sm font-bold text-royal-ink">{avgRating.toFixed(1)}</span>
                 </>
               )}
-              <span className="text-sm text-slate-500">
+              <span className="text-sm text-royal-soft">
                 {avgRating > 0 ? '·' : ''} Cooked {reviews.length}{' '}
                 {reviews.length === 1 ? 'time' : 'times'}
                 {avgRating === 0 ? ' · not rated yet' : ''}
@@ -114,7 +131,7 @@ export function RecipeDetailModal({
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-royal-soft">
             <span className="inline-flex items-center gap-1.5">
               <ClockIcon width={16} height={16} /> Prep {recipe.prepTime}
             </span>
@@ -127,7 +144,7 @@ export function RecipeDetailModal({
             </span>
           </div>
 
-          <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-royal-faint">
             <BookIcon width={14} height={14} /> {sourceLabel(recipe.sourceFile)}
           </p>
 
@@ -136,7 +153,7 @@ export function RecipeDetailModal({
               {recipe.protein.map((p) => (
                 <span
                   key={p}
-                  className="rounded-full bg-herb-100 px-2.5 py-1 text-xs font-semibold text-herb-700"
+                  className="rounded-md bg-junebud px-2.5 py-1 text-xs font-semibold text-royal-ink"
                 >
                   {proteinLabel(p)}
                 </span>
@@ -144,7 +161,7 @@ export function RecipeDetailModal({
               {recipe.tags.map((t) => (
                 <span
                   key={t}
-                  className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
+                  className="rounded-md bg-royal/10 px-2.5 py-1 text-xs font-medium text-royal-soft"
                 >
                   #{t}
                 </span>
@@ -161,14 +178,14 @@ export function RecipeDetailModal({
 
           {/* Ingredients */}
           <section className="mt-6">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-pumpkin-ink">
               Ingredients
             </h3>
-            <ul className="divide-y divide-slate-200/70 rounded-xl border border-slate-200/70 bg-white">
+            <ul className="divide-y divide-royal/10 rounded-xl border border-royal/15 bg-white">
               {recipe.ingredients.map((ing) => (
                 <li key={ing.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
-                  <span className="text-slate-700">{ing.name}</span>
-                  <span className="shrink-0 text-right text-sm font-semibold text-slate-500">
+                  <span className="text-royal-ink">{ing.name}</span>
+                  <span className="shrink-0 text-right text-sm font-semibold text-royal-soft">
                     {formatMeasure(ing.quantity, ing.unit, ing.altQuantity, ing.altUnit)}
                   </span>
                 </li>
@@ -178,14 +195,14 @@ export function RecipeDetailModal({
 
           {/* Steps */}
           <section className="mt-6">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">Steps</h3>
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-pumpkin-ink">Steps</h3>
             <ol className="space-y-3">
               {recipe.steps.map((step) => (
                 <li key={step.id} className="flex gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-herb-500 text-sm font-bold text-white">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pumpkin text-sm font-bold text-white">
                     {step.order}
                   </span>
-                  <p className="pt-0.5 leading-relaxed text-slate-700">{step.instruction}</p>
+                  <p className="pt-0.5 leading-relaxed text-royal-ink">{step.instruction}</p>
                 </li>
               ))}
             </ol>
@@ -194,24 +211,24 @@ export function RecipeDetailModal({
           {/* Past reviews from the cooking journal */}
           {withNotes.length > 0 && (
             <section className="mt-6">
-              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-pumpkin-ink">
                 Reviews
               </h3>
               <ul className="space-y-2">
                 {withNotes.map((entry) => (
-                  <li key={entry.id} className="rounded-xl border border-slate-200/70 bg-white p-3">
+                  <li key={entry.id} className="rounded-xl border border-royal/15 bg-white p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       {entry.rating > 0 ? (
                         <StarRating value={entry.rating} size={16} />
                       ) : (
-                        <span className="text-xs font-medium text-slate-400">Not rated</span>
+                        <span className="text-xs font-medium text-royal-faint">Not rated</span>
                       )}
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-royal-faint">
                         <CalendarIcon width={13} height={13} /> {formatDate(entry.dateCooked)}
                       </span>
                     </div>
                     {entry.notes.trim() && (
-                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-royal-soft">
                         {entry.notes}
                       </p>
                     )}
@@ -221,20 +238,34 @@ export function RecipeDetailModal({
             </section>
           )}
 
-          <button
-            onClick={handleDelete}
-            className="btn-ghost mt-6 text-sm text-red-500 hover:bg-red-50 hover:text-red-600"
-          >
-            <TrashIcon width={16} height={16} /> Delete recipe
-          </button>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              onClick={handleExportPdf}
+              className="btn-ghost text-sm text-royal-soft hover:bg-royal/5 hover:text-royal-ink"
+            >
+              <DownloadIcon width={16} height={16} className="text-pumpkin" /> Export PDF
+            </button>
+            <button
+              onClick={handleDelete}
+              className="btn-ghost text-sm text-red-500 hover:bg-red-50 hover:text-red-600"
+            >
+              <TrashIcon width={16} height={16} /> Delete recipe
+            </button>
+          </div>
         </div>
 
         {/* Sticky actions */}
-        <div className="grid shrink-0 grid-cols-1 gap-2 border-t border-slate-200/70 bg-white p-4 sm:grid-cols-2">
-          <button onClick={handleAddToShopping} className="btn-secondary">
+        <div className="grid shrink-0 grid-cols-1 gap-2 border-t border-royal/15 bg-white p-4 sm:grid-cols-2">
+          <button
+            onClick={handleAddToShopping}
+            className="btn inline-flex items-center justify-center gap-2 rounded-xl border border-royal/40 bg-transparent text-royal hover:bg-royal/5"
+          >
             <CartIcon width={18} height={18} /> Add to Shopping List
           </button>
-          <button onClick={handleStartCooking} className="btn-primary">
+          <button
+            onClick={handleStartCooking}
+            className="btn inline-flex items-center justify-center gap-2 rounded-xl bg-pumpkin text-white hover:bg-pumpkin/90"
+          >
             <ChefIcon width={18} height={18} /> Start Cooking
           </button>
         </div>
