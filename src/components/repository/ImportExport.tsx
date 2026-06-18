@@ -10,7 +10,7 @@ import { Spinner } from '../ui/Spinner'
  * array of recipes, { recipes: [...] }, or a full export from this app.
  */
 export function ImportExport() {
-  const { recipes, cookLog, addRecipe, mergeCookLog, pushToast } = useApp()
+  const { recipes, cookLog, importRecipes, mergeCookLog, pushToast } = useApp()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -62,21 +62,19 @@ export function ImportExport() {
           /* skip malformed entries */
         }
       }
-      const have = new Set(recipes.map((r) => r.title.trim().toLowerCase()))
-      const fresh = imported.filter((r) => !have.has(r.title.trim().toLowerCase()))
-      for (const recipe of [...fresh].reverse()) addRecipe(recipe)
+      const { added, updated } = importRecipes(imported)
 
       if (Array.isArray(obj?.cookLog)) {
         mergeCookLog(obj.cookLog as CookLogEntry[])
       }
 
-      const skipped = imported.length - fresh.length
-      if (fresh.length === 0) {
-        pushToast(`All ${imported.length} recipes in that file are already in your library`, 'info')
+      if (added === 0 && updated === 0) {
+        pushToast('No recipes found in that file.', 'info')
       } else {
-        pushToast(
-          `Imported ${fresh.length} recipes${skipped > 0 ? ` (${skipped} already in your library)` : ''}`
-        )
+        const parts: string[] = []
+        if (added > 0) parts.push(`added ${added}`)
+        if (updated > 0) parts.push(`refreshed ${updated}`)
+        pushToast(`Import complete — ${parts.join(' · ')}`)
       }
     } finally {
       setBusy(false)

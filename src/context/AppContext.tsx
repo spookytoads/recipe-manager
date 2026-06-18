@@ -43,6 +43,7 @@ interface AppContextValue {
   // Recipes
   recipes: Recipe[]
   addRecipe: (recipe: Recipe) => void
+  importRecipes: (incoming: Recipe[]) => { added: number; updated: number }
   deleteRecipe: (id: string) => void
 
   // Shopping
@@ -298,6 +299,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRecipes((prev) => [recipe, ...prev])
   }, [])
 
+  // Import a batch: refresh recipes that already exist (matched by title, keeping
+  // their id so journal/cook references survive) and add the genuinely new ones.
+  const importRecipes = useCallback(
+    (incoming: Recipe[]): { added: number; updated: number } => {
+      const indexByTitle = new Map<string, number>()
+      recipes.forEach((r, i) => indexByTitle.set(r.title.trim().toLowerCase(), i))
+      const next = [...recipes]
+      const fresh: Recipe[] = []
+      let updated = 0
+      for (const inc of incoming) {
+        const key = inc.title.trim().toLowerCase()
+        const idx = indexByTitle.get(key)
+        if (idx != null) {
+          next[idx] = { ...inc, id: next[idx].id }
+          updated++
+        } else {
+          fresh.push(inc)
+          indexByTitle.set(key, next.length + fresh.length - 1)
+        }
+      }
+      setRecipes([...fresh.reverse(), ...next])
+      return { added: fresh.length, updated }
+    },
+    [recipes]
+  )
+
   const deleteRecipe = useCallback((id: string) => {
     setRecipes((prev) => prev.filter((r) => r.id !== id))
     setCookQueue((prev) => prev.filter((qid) => qid !== id))
@@ -433,6 +460,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSection,
       recipes,
       addRecipe,
+      importRecipes,
       deleteRecipe,
       shopping,
       multiplier,
@@ -471,6 +499,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       section,
       recipes,
       addRecipe,
+      importRecipes,
       deleteRecipe,
       shopping,
       multiplier,
