@@ -1,14 +1,15 @@
 import { useApp, type Section } from '../context/AppContext'
 import { aggregateKey } from '../context/AppContext'
 import { BookIcon, CartIcon, ChefIcon, JournalIcon, UserIcon } from './ui/icons'
+import { ChefLogo } from './ui/Logo'
 import { useMemo, useState } from 'react'
 import { AuthModal } from './AuthModal'
 
 const NAV: { id: Section; label: string; Icon: typeof BookIcon }[] = [
-  { id: 'repository', label: 'Repository', Icon: BookIcon },
-  { id: 'shopping', label: 'Shopping', Icon: CartIcon },
-  { id: 'cook', label: 'Cook', Icon: ChefIcon },
-  { id: 'journal', label: 'Journal', Icon: JournalIcon },
+  { id: 'repository', label: 'recipes', Icon: BookIcon },
+  { id: 'shopping', label: 'shopping', Icon: CartIcon },
+  { id: 'cook', label: 'cook', Icon: ChefIcon },
+  { id: 'journal', label: 'journal', Icon: JournalIcon },
 ]
 
 export function NavBar() {
@@ -32,18 +33,16 @@ export function NavBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-cream/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-royal/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 sm:px-6">
         <button
           onClick={() => setSection('repository')}
           className="flex shrink-0 items-center gap-2 py-3 pr-2 text-left"
           aria-label="Recipe Manager home"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-herb-500 text-white">
-            <ChefIcon width={18} height={18} />
-          </span>
-          <span className="hidden text-base font-extrabold tracking-tight text-slate-800 sm:block">
-            Recipe<span className="text-herb-600">Manager</span>
+          <ChefLogo width={30} height={30} className="shrink-0" />
+          <span className="hidden font-serif text-lg font-medium tracking-tight text-choc sm:block">
+            recipe manager
           </span>
         </button>
 
@@ -58,8 +57,8 @@ export function NavBar() {
                 aria-current={active ? 'page' : undefined}
                 className={`tap-target relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors sm:flex-none sm:flex-row sm:gap-2 sm:text-sm ${
                   active
-                    ? 'bg-herb-500 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100'
+                    ? 'bg-pumpkin text-white shadow-sm'
+                    : 'text-royal-mute hover:bg-white/10 hover:text-choc'
                 }`}
               >
                 <span className="relative">
@@ -67,7 +66,7 @@ export function NavBar() {
                   {count != null && (
                     <span
                       className={`absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
-                        active ? 'bg-white text-herb-600' : 'bg-herb-500 text-white'
+                        active ? 'bg-white text-pumpkin' : 'bg-pumpkin text-white'
                       }`}
                     >
                       {count}
@@ -83,7 +82,7 @@ export function NavBar() {
         {cloudEnabled && (
           <button
             onClick={() => setAuthOpen(true)}
-            className="tap-target relative flex shrink-0 items-center justify-center rounded-xl px-2 text-slate-600 hover:bg-slate-100"
+            className="tap-target relative flex shrink-0 items-center justify-center rounded-xl px-2 text-royal-mute hover:bg-white/10 hover:text-choc"
             aria-label={user ? 'Account' : 'Sign in to sync'}
             title={user ? `Signed in as ${user.email}` : 'Sign in to sync'}
           >
@@ -91,7 +90,7 @@ export function NavBar() {
             {user && (
               <span
                 className={`absolute right-1 top-1.5 h-2 w-2 rounded-full ${
-                  syncStatus === 'error' ? 'bg-red-500' : 'bg-herb-500'
+                  syncStatus === 'error' ? 'bg-red-500' : 'bg-junebud'
                 }`}
               />
             )}

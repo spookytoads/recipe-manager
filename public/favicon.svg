@@ -1,16 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#5C6B33"/>
-  <g transform="translate(256 256) scale(0.82) translate(-256 -256)" fill="#F4EFE4">
-    <g transform="rotate(-18 256 256)">
-      <ellipse cx="256" cy="170" rx="40" ry="54"/>
-      <rect x="243" y="206" width="26" height="200" rx="13"/>
+  <rect width="512" height="512" fill="#2C20D4"/>
+  <g transform="translate(256 278) scale(0.82) translate(-256 -278)">
+    <g transform="rotate(-10 256 300)">
+      <g fill="#F4F0E5">
+        <rect x="176" y="248" width="160" height="70" rx="16"/>
+        <circle cx="205" cy="236" r="52"/>
+        <circle cx="256" cy="202" r="68"/>
+        <circle cx="307" cy="238" r="50"/>
+      </g>
+      <g stroke="#2C20D4" stroke-width="7" stroke-linecap="round">
+        <line x1="216" y1="266" x2="216" y2="304"/>
+        <line x1="256" y1="266" x2="256" y2="304"/>
+        <line x1="296" y1="266" x2="296" y2="304"/>
+      </g>
     </g>
-    <g transform="rotate(18 256 256)">
-      <rect x="234" y="138" width="9" height="86" rx="4.5"/>
-      <rect x="251.5" y="138" width="9" height="86" rx="4.5"/>
-      <rect x="269" y="138" width="9" height="86" rx="4.5"/>
-      <rect x="236" y="205" width="40" height="30" rx="12"/>
-      <rect x="243" y="226" width="26" height="180" rx="13"/>
-    </g>
+    <circle cx="233" cy="348" r="11" fill="#F4F0E5"/>
+    <circle cx="279" cy="348" r="11" fill="#F4F0E5"/>
+    <rect x="228" y="360" width="56" height="62" rx="28" fill="#FF5E33"/>
+    <line x1="256" y1="368" x2="256" y2="394" stroke="#D9491F" stroke-width="6" stroke-linecap="round"/>
   </g>
 </svg>

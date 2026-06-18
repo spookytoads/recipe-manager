@@ -98,18 +98,18 @@ export function ImportExport() {
       <button
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="btn-ghost py-1.5 text-xs text-slate-500 hover:text-slate-700"
+        className="btn-ghost py-1.5 text-xs text-royal-mute hover:bg-white/10 hover:text-choc"
         title="Import recipes from a JSON file"
       >
-        {busy ? <Spinner size={14} /> : null} Import file
+        {busy ? <Spinner size={14} /> : null} import file
       </button>
-      <span className="text-slate-300">·</span>
+      <span className="text-choc/30">·</span>
       <button
         onClick={handleExport}
-        className="btn-ghost py-1.5 text-xs text-slate-500 hover:text-slate-700"
+        className="btn-ghost py-1.5 text-xs text-royal-mute hover:bg-white/10 hover:text-choc"
         title="Download a backup of all recipes and journal entries"
       >
-        Export backup
+        export backup
       </button>
     </div>
   )

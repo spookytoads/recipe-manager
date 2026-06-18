@@ -125,25 +125,25 @@ export function Repository() {
       {/* Header row */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 sm:text-3xl">
-            Recipe Repository
+          <h1 className="font-serif text-3xl font-medium tracking-tight text-choc sm:text-4xl">
+            repository
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-royal-mute">
             {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
           </p>
           <button
             onClick={() => setRoulette(true)}
             disabled={recipes.length === 0}
-            className="btn-primary mt-3"
+            className="btn-line mt-3"
             title="Roll the dice for three random dinner ideas"
           >
-            <DiceIcon width={18} height={18} /> Feeling Frisky?
+            <DiceIcon width={18} height={18} className="text-pumpkin" /> feeling frisky?
           </button>
         </div>
         <div className="flex flex-col items-stretch gap-2">
           <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
-            <button onClick={() => setAdding(true)} className="btn-secondary">
-              <PlusIcon width={18} height={18} /> Add manually
+            <button onClick={() => setAdding(true)} className="btn-line">
+              <PlusIcon width={18} height={18} className="text-pumpkin" /> add manually
             </button>
             <PdfUpload onExtractingChange={setExtracting} />
           </div>
@@ -156,14 +156,14 @@ export function Repository() {
         <SearchIcon
           width={18}
           height={18}
-          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-pumpkin"
         />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by title, tag, or cuisine…"
-          className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-herb-400 focus:ring-2 focus:ring-herb-100"
+          placeholder="search by title, tag, or cuisine…"
+          className="w-full rounded-lg border-0 bg-royal-deep py-3 pl-11 pr-4 text-white shadow-sm outline-none transition placeholder:text-white/55 focus:ring-2 focus:ring-white/15"
         />
       </div>
 
@@ -172,12 +172,12 @@ export function Repository() {
         <button
           onClick={() => setFiltersOpen((o) => !o)}
           aria-expanded={filtersOpen}
-          className={`btn-secondary ${filtersOpen ? 'border-herb-400 text-herb-700' : ''}`}
+          className={`btn-line ${filtersOpen ? 'bg-white/10' : ''}`}
         >
-          <FilterIcon width={18} height={18} />
-          Filters
+          <FilterIcon width={18} height={18} className="text-pumpkin" />
+          filters
           {activeFilterCount > 0 && (
-            <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-herb-500 px-1.5 text-xs font-bold text-white">
+            <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-pumpkin px-1.5 text-xs font-bold text-white">
               {activeFilterCount}
             </span>
           )}
@@ -189,17 +189,17 @@ export function Repository() {
         </button>
 
         <label className="ml-auto flex items-center gap-2">
-          <span className="hidden text-xs font-semibold uppercase tracking-wide text-slate-400 sm:inline">
-            Sort
+          <span className="hidden text-xs font-semibold tracking-wide text-royal-mute sm:inline">
+            sort
           </span>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="tap-target rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-herb-400"
+            className="tap-target rounded-lg border border-choc/40 bg-transparent px-3 py-2 text-sm font-medium text-choc shadow-sm outline-none focus:border-choc/70"
           >
-            <option value="newest">Newest first</option>
-            <option value="rating">Highest rated</option>
-            <option value="title">Title A–Z</option>
+            <option value="newest">newest first</option>
+            <option value="rating">highest rated</option>
+            <option value="title">title a–z</option>
           </select>
         </label>
       </div>
@@ -230,16 +230,16 @@ export function Repository() {
           )}
           <button
             onClick={clearAllFilters}
-            className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline"
+            className="text-xs font-semibold text-royal-mute underline-offset-2 hover:text-choc hover:underline"
           >
             Clear all
           </button>
         </div>
       )}
 
-      {/* Collapsible filter panel — grouped controls, stacks cleanly on mobile */}
+      {/* Collapsible filter panel — white card with grouped controls */}
       {filtersOpen && (
-        <div className="mb-6 animate-slide-up space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-6 animate-slide-up space-y-4 rounded-xl bg-choc p-4 shadow-lg">
           <FilterGroup label="Protein">
             {PROTEIN_FILTERS.map((f) => {
               const active = filter === f
@@ -249,8 +249,8 @@ export function Repository() {
                   onClick={() => setFilter(f)}
                   className={`chip ${
                     active
-                      ? 'border-herb-500 bg-herb-500 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-herb-300 hover:text-herb-700'
+                      ? 'border-royal bg-royal text-white shadow-sm'
+                      : 'border-royal/25 bg-transparent text-royal-soft hover:border-royal/50 hover:text-royal-ink'
                   }`}
                 >
                   {f}
@@ -260,7 +260,7 @@ export function Repository() {
           </FilterGroup>
 
           <FilterGroup label="Calories per serving">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <input
                 type="number"
                 inputMode="numeric"
@@ -269,9 +269,9 @@ export function Repository() {
                 onChange={(e) => setCalMin(e.target.value === '' ? null : Number(e.target.value))}
                 placeholder="min"
                 aria-label="Minimum calories"
-                className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                className="w-20 rounded-lg border border-royal/20 bg-white px-2.5 py-2 text-sm text-royal-ink shadow-sm outline-none placeholder:text-royal-faint focus:border-pumpkin focus:ring-2 focus:ring-pumpkin/20"
               />
-              <span className="text-slate-400">–</span>
+              <span className="text-royal-faint">–</span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -280,9 +280,9 @@ export function Repository() {
                 onChange={(e) => setCalMax(e.target.value === '' ? null : Number(e.target.value))}
                 placeholder="max"
                 aria-label="Maximum calories"
-                className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                className="w-20 rounded-lg border border-royal/20 bg-white px-2.5 py-2 text-sm text-royal-ink shadow-sm outline-none placeholder:text-royal-faint focus:border-pumpkin focus:ring-2 focus:ring-pumpkin/20"
               />
-              <span className="text-xs font-medium text-slate-400">cal · leave min blank for “under”</span>
+              <span className="text-xs font-medium text-royal-faint">cal · leave min blank for “under”</span>
             </div>
           </FilterGroup>
 
@@ -295,8 +295,8 @@ export function Repository() {
                   onClick={() => setCookedFilter(id)}
                   className={`chip ${
                     active
-                      ? 'border-slate-700 bg-slate-700 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800'
+                      ? 'border-royal bg-royal text-white shadow-sm'
+                      : 'border-royal/25 bg-transparent text-royal-soft hover:border-royal/50 hover:text-royal-ink'
                   }`}
                 >
                   {label}
@@ -309,7 +309,7 @@ export function Repository() {
             <select
               value={cookbook}
               onChange={(e) => setCookbook(e.target.value)}
-              className="tap-target w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-herb-400"
+              className="tap-target w-full max-w-xs rounded-lg border border-royal/20 bg-white px-3 py-2 text-sm font-medium text-royal-ink shadow-sm outline-none focus:border-pumpkin"
             >
               <option value="All">All cookbooks</option>
               {cookbooks.map((c) => (
@@ -324,7 +324,7 @@ export function Repository() {
             <div className="flex justify-end pt-1">
               <button
                 onClick={clearAllFilters}
-                className="text-sm font-semibold text-slate-500 hover:text-slate-700"
+                className="text-sm font-semibold text-royal-soft hover:text-royal-ink"
               >
                 Clear all filters
               </button>
@@ -380,7 +380,7 @@ export function Repository() {
 function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-royal-faint">{label}</p>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   )
@@ -388,11 +388,11 @@ function FilterGroup({ label, children }: { label: string; children: ReactNode }
 
 function ActiveFilterChip({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-herb-200 bg-herb-50 py-1 pl-3 pr-1 text-sm font-medium text-herb-700">
+    <span className="inline-flex items-center gap-1 rounded-full border border-choc/30 bg-white/5 py-1 pl-3 pr-1 text-sm font-medium text-choc">
       {label}
       <button
         onClick={onClear}
-        className="flex h-5 w-5 items-center justify-center rounded-full text-herb-500 transition-colors hover:bg-herb-100 hover:text-herb-800"
+        className="flex h-5 w-5 items-center justify-center rounded-full text-royal-mute transition-colors hover:bg-white/10 hover:text-choc"
         aria-label={`Remove ${label} filter`}
       >
         <CloseIcon width={13} height={13} />
@@ -413,20 +413,20 @@ function SkeletonGrid() {
 
 function EmptyLibrary({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center">
-      <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-herb-50 text-herb-500">
+    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-choc/25 bg-white/5 px-6 py-16 text-center">
+      <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-choc">
         <BookIcon width={32} height={32} />
       </span>
-      <h2 className="text-lg font-bold text-slate-800">No recipes yet</h2>
-      <p className="mt-1 max-w-xs text-sm text-slate-500">
+      <h2 className="text-lg font-bold text-choc">No recipes yet</h2>
+      <p className="mt-1 max-w-xs text-sm text-royal-mute">
         Upload a recipe PDF and we'll extract it for you — or add one by hand.
       </p>
       <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row">
-        <button onClick={onAdd} className="btn-secondary">
-          <PlusIcon width={16} height={16} /> Add manually
+        <button onClick={onAdd} className="btn-line">
+          <PlusIcon width={16} height={16} className="text-pumpkin" /> add manually
         </button>
-        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-herb-600">
-          <UploadIcon width={16} height={16} /> or use “Upload PDF” above
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-royal-mute">
+          <UploadIcon width={16} height={16} className="text-pumpkin" /> or use “upload pdf” above
         </span>
       </div>
     </div>
@@ -435,13 +435,13 @@ function EmptyLibrary({ onAdd }: { onAdd: () => void }) {
 
 function NoMatches({ onReset }: { onReset: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-16 text-center">
-      <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-choc/25 bg-white/5 px-6 py-16 text-center">
+      <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-royal-mute">
         <SearchIcon width={32} height={32} />
       </span>
-      <h2 className="text-lg font-bold text-slate-800">No matching recipes</h2>
-      <p className="mt-1 text-sm text-slate-500">Try a different search or filter.</p>
-      <button onClick={onReset} className="btn-secondary mt-4">
+      <h2 className="text-lg font-bold text-choc">No matching recipes</h2>
+      <p className="mt-1 text-sm text-royal-mute">Try a different search or filter.</p>
+      <button onClick={onReset} className="btn-line mt-4">
         Clear filters
       </button>
     </div>

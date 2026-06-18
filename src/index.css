@@ -50,6 +50,15 @@ body {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
 
+  /* Blue-theme buttons (used on the royal-blue Repository surface) */
+  .btn-line {
+    @apply btn border border-choc/45 bg-transparent text-choc hover:bg-white/10;
+  }
+
+  .btn-choc {
+    @apply btn bg-choc text-royal-ink hover:bg-choc/90;
+  }
+
   .card {
     @apply rounded-2xl border border-slate-200/70 bg-white shadow-sm;
   }

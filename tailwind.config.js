@@ -17,9 +17,25 @@ export default {
           900: '#1d3a20',
         },
         cream: '#faf8f4',
+        // Blue / orange / June-bud theme (Repository + nav)
+        royal: {
+          DEFAULT: '#2C20D4',
+          deep: '#241AA8',
+          ink: '#221A7A',
+          soft: '#5A52A0',
+          faint: '#8983C0',
+          mute: '#B9B4E4',
+        },
+        pumpkin: {
+          DEFAULT: '#FF5E33',
+          ink: '#C2401E',
+        },
+        junebud: '#BDCF4F',
+        choc: '#F3EFE2',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif'],
+        serif: ['Georgia', 'Cambria', '"Times New Roman"', 'serif'],
       },
       keyframes: {
         'fade-in': {

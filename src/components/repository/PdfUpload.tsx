@@ -92,21 +92,21 @@ export function PdfUpload({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="btn-primary w-full sm:w-auto"
+        className="btn-choc w-full sm:w-auto"
       >
         {busy ? (
           <>
-            <Spinner size={18} /> {status ?? 'Extracting…'}
+            <Spinner size={18} /> {status ?? 'extracting…'}
           </>
         ) : (
           <>
-            <UploadIcon width={18} height={18} /> Upload PDF
+            <UploadIcon width={18} height={18} className="text-pumpkin" /> upload pdf
           </>
         )}
       </button>
 
       {busy && status && (
-        <p className="max-w-sm text-xs font-medium text-slate-500">
+        <p className="max-w-sm text-xs font-medium text-royal-mute">
           Large cookbooks take several minutes — keep this tab open and your screen awake until
           it finishes.
         </p>
