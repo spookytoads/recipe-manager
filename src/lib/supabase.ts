@@ -25,16 +25,24 @@ export interface SyncState {
   cookLog: CookLogEntry[]
 }
 
-/** Fetch a user's saved state, or null if they have none yet. */
-export async function fetchCloudState(userId: string): Promise<SyncState | null> {
+/** A user's cloud state plus when it was last written (for last-write-wins). */
+export interface CloudSnapshot {
+  state: SyncState
+  updatedAt: string | null
+}
+
+/** Fetch a user's saved state (with its last-updated time), or null if none yet. */
+export async function fetchCloudState(userId: string): Promise<CloudSnapshot | null> {
   if (!supabase) return null
   const { data, error } = await supabase
     .from('app_state')
-    .select('data')
+    .select('data, updated_at')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error
-  return (data?.data as SyncState | undefined) ?? null
+  const state = data?.data as SyncState | undefined
+  if (!state) return null
+  return { state, updatedAt: (data?.updated_at as string | undefined) ?? null }
 }
 
 /** Upsert a user's full state. */

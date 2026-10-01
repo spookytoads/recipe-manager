@@ -14,6 +14,7 @@ export const KEYS = {
   cookProgress: `${PREFIX}cook-progress`,
   cookLog: `${PREFIX}cook-log`,
   seeded: `${PREFIX}seeded`,
+  updatedAt: `${PREFIX}updated-at`,
 } as const
 
 export function load<T>(key: string, fallback: T): T {

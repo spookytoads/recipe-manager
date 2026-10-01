@@ -141,6 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
   const hydratingRef = useRef(false)
   const saveTimer = useRef<number | null>(null)
+  const prevSyncRef = useRef<Record<string, unknown> | null>(null)
 
   // --- Toasts ---
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -154,6 +155,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(KEYS.cookQueue, cookQueue), [cookQueue])
   useEffect(() => save(KEYS.cookProgress, cookProgress), [cookProgress])
   useEffect(() => save(KEYS.cookLog, cookLog), [cookLog])
+
+  // Stamp when local data genuinely changes so login can tell whether local or
+  // cloud is newer. We compare slice references (not a "skip first run" flag) so
+  // the initial mount, StrictMode's double-invoke, and cloud-hydration writes all
+  // leave the stamp untouched — only a real user edit bumps it.
+  useEffect(() => {
+    const cur = { recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog }
+    const prev = prevSyncRef.current
+    prevSyncRef.current = cur
+    if (hydratingRef.current || prev === null) return
+    const changed = (Object.keys(cur) as (keyof typeof cur)[]).some((k) => prev[k] !== cur[k])
+    if (changed) save(KEYS.updatedAt, new Date().toISOString())
+  }, [recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog])
 
   // --- Cloud sync ---
   // Keep a always-fresh snapshot so login can push the current local state up.
@@ -207,8 +221,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const remote = await fetchCloudState(u.id)
         if (remote) {
-          // This account has cloud data — adopt it.
-          applyState(remote)
+          // Last-write-wins: only adopt the cloud copy when it's at least as new
+          // as our local data. Otherwise local changes that never got pushed (e.g.
+          // checkboxes toggled right before the app was backgrounded on iOS) would
+          // be clobbered by a stale cloud snapshot. When local is newer, keep it
+          // and push it up instead.
+          const localStamp = load<string>(KEYS.updatedAt, '')
+          const cloudStamp = remote.updatedAt ?? ''
+          if (!localStamp || (cloudStamp && cloudStamp >= localStamp)) {
+            applyState(remote.state)
+          } else {
+            await saveCloudState(u.id, stateRef.current)
+          }
         } else {
           // First login for this account — seed the cloud from current local data.
           await saveCloudState(u.id, stateRef.current)
@@ -256,6 +280,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .catch(() => setSyncStatus('error'))
     }, 1200)
   }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog])
+
+  // iOS suspends a backgrounded PWA before the debounce above can fire, so flush
+  // the latest snapshot the moment the app is hidden/closed. Without this, a check
+  // toggled right before closing never reaches the cloud.
+  useEffect(() => {
+    if (!supabase || !user) return
+    const flush = () => {
+      if (document.visibilityState !== 'hidden') return
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+      save(KEYS.updatedAt, new Date().toISOString())
+      void saveCloudState(user.id, stateRef.current).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', flush)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', flush)
+      window.removeEventListener('pagehide', flush)
+    }
+  }, [user])
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error('Cloud sync is not configured.')
