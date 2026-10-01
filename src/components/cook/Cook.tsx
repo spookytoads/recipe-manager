@@ -245,7 +245,11 @@ export function Cook() {
                         {step.instruction}
                       </p>
                       {step.timerSeconds != null && step.timerSeconds > 0 && !done && (
-                        <Timer seconds={step.timerSeconds} />
+                        <Timer
+                          seconds={step.timerSeconds}
+                          storageKey={`${recipe.id}:${step.id}`}
+                          label={`${recipe.title} · step ${step.order}`}
+                        />
                       )}
                     </div>
                   </div>
