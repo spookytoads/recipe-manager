@@ -303,24 +303,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // their id so journal/cook references survive) and add the genuinely new ones.
   const importRecipes = useCallback(
     (incoming: Recipe[]): { added: number; updated: number } => {
+      const existingCount = recipes.length
+      // index -> position in `next`; seeded with current recipes, then extended
+      // as new titles are appended so duplicates *within* the batch land safely.
       const indexByTitle = new Map<string, number>()
       recipes.forEach((r, i) => indexByTitle.set(r.title.trim().toLowerCase(), i))
       const next = [...recipes]
-      const fresh: Recipe[] = []
-      let updated = 0
+      const updatedTitles = new Set<string>()
       for (const inc of incoming) {
         const key = inc.title.trim().toLowerCase()
         const idx = indexByTitle.get(key)
         if (idx != null) {
+          // Refresh in place; keep the existing id so journal/cook refs survive.
           next[idx] = { ...inc, id: next[idx].id }
-          updated++
+          if (idx < existingCount) updatedTitles.add(key)
         } else {
-          fresh.push(inc)
-          indexByTitle.set(key, next.length + fresh.length - 1)
+          next.push({ ...inc })
+          indexByTitle.set(key, next.length - 1)
         }
       }
-      setRecipes([...fresh.reverse(), ...next])
-      return { added: fresh.length, updated }
+      const addedList = next.slice(existingCount) // genuinely new (deduped within batch)
+      const keptList = next.slice(0, existingCount) // existing, some refreshed in place
+      setRecipes([...addedList.reverse(), ...keptList])
+      return { added: addedList.length, updated: updatedTitles.size }
     },
     [recipes]
   )
