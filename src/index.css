@@ -14,7 +14,8 @@ body,
 
 body {
   margin: 0;
-  background-color: #faf8f4;
+  /* Royal blue so the iOS safe areas (status bar + home indicator) match the app. */
+  background-color: #2c20d4;
   color: #1e293b;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
