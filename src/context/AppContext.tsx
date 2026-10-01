@@ -15,6 +15,7 @@ import { uid } from '../lib/util'
 import {
   fetchCloudState,
   isSupabaseConfigured,
+  mergeSyncStates,
   saveCloudState,
   supabase,
   type SyncState,
@@ -221,18 +222,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const remote = await fetchCloudState(u.id)
         if (remote) {
-          // Last-write-wins: only adopt the cloud copy when it's at least as new
-          // as our local data. Otherwise local changes that never got pushed (e.g.
-          // checkboxes toggled right before the app was backgrounded on iOS) would
-          // be clobbered by a stale cloud snapshot. When local is newer, keep it
-          // and push it up instead.
+          // Merge rather than overwrite: the recipe library and journal are the
+          // union of both sides, so an empty/stale device can't wipe the other's
+          // recipes. Shopping checks and other volatile activity come from the
+          // more-recently-edited side (last-write-wins). Push the merged result
+          // so both devices converge instead of fighting.
           const localStamp = load<string>(KEYS.updatedAt, '')
           const cloudStamp = remote.updatedAt ?? ''
-          if (!localStamp || (cloudStamp && cloudStamp >= localStamp)) {
-            applyState(remote.state)
-          } else {
-            await saveCloudState(u.id, stateRef.current)
-          }
+          const localIsNewer = !!localStamp && (!cloudStamp || localStamp > cloudStamp)
+          const merged = mergeSyncStates(stateRef.current, remote.state, localIsNewer)
+          applyState(merged)
+          await saveCloudState(u.id, merged)
         } else {
           // First login for this account — seed the cloud from current local data.
           await saveCloudState(u.id, stateRef.current)
