@@ -23,7 +23,11 @@ export interface SyncState {
   cookQueue: string[]
   cookProgress: Record<string, CookProgress>
   cookLog: CookLogEntry[]
+  /** Normalized titles of recipes the user deleted — so deletions propagate. */
+  deletedTitles?: string[]
 }
+
+const normTitle = (t: string) => t.trim().toLowerCase()
 
 /** A user's cloud state plus when it was last written (for last-write-wins). */
 export interface CloudSnapshot {
@@ -55,12 +59,26 @@ export async function fetchCloudState(userId: string): Promise<CloudSnapshot | n
  * whichever side was edited more recently.
  */
 export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewer: boolean): SyncState {
+  const newer = localIsNewer ? local : remote
+  const older = localIsNewer ? remote : local
+
   // Recipes: union by title. On a title collision keep the newer side's copy.
   const recipesByTitle = new Map<string, Recipe>()
-  const firstPass = localIsNewer ? remote.recipes : local.recipes
-  const secondPass = localIsNewer ? local.recipes : remote.recipes
-  for (const r of firstPass ?? []) recipesByTitle.set(r.title.trim().toLowerCase(), r)
-  for (const r of secondPass ?? []) recipesByTitle.set(r.title.trim().toLowerCase(), r)
+  for (const r of older.recipes ?? []) recipesByTitle.set(normTitle(r.title), r)
+  for (const r of newer.recipes ?? []) recipesByTitle.set(normTitle(r.title), r)
+
+  // Deletions: union both sides' tombstones, but let the more-recent side's
+  // intent win a conflict — if the newer side currently *has* a title (and did
+  // not tombstone it) it was re-added after the delete, so un-tombstone it.
+  const tomb = new Set<string>([...(local.deletedTitles ?? []), ...(remote.deletedTitles ?? [])].map(normTitle))
+  const newerTomb = new Set((newer.deletedTitles ?? []).map(normTitle))
+  const newerTitles = new Set((newer.recipes ?? []).map((r) => normTitle(r.title)))
+  for (const t of [...tomb]) {
+    if (newerTitles.has(t) && !newerTomb.has(t)) tomb.delete(t)
+  }
+
+  // Drop any recipe whose title is tombstoned.
+  const recipes = [...recipesByTitle.values()].filter((r) => !tomb.has(normTitle(r.title)))
 
   // Cooking journal: union by entry id.
   const logById = new Map<string, CookLogEntry>()
@@ -71,8 +89,9 @@ export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewe
   const activity = localIsNewer ? local : remote
 
   return {
-    recipes: [...recipesByTitle.values()],
+    recipes,
     cookLog: [...logById.values()],
+    deletedTitles: [...tomb],
     shopping: activity.shopping ?? [],
     checked: activity.checked ?? [],
     multiplier: activity.multiplier ?? 1,

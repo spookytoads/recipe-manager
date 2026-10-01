@@ -135,6 +135,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     load<CookLogEntry[]>(KEYS.cookLog, [])
   )
 
+  // Normalized titles of deleted recipes, so a deletion propagates through sync
+  // instead of the recipe being resurrected from another device's copy.
+  const [deletedTitles, setDeletedTitles] = useState<string[]>(() =>
+    load<string[]>(KEYS.deleted, [])
+  )
+  const normTitle = (t: string) => t.trim().toLowerCase()
+
   // --- Cloud sync ---
   const [user, setUser] = useState<CloudUser | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(
@@ -156,6 +163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(KEYS.cookQueue, cookQueue), [cookQueue])
   useEffect(() => save(KEYS.cookProgress, cookProgress), [cookProgress])
   useEffect(() => save(KEYS.cookLog, cookLog), [cookLog])
+  useEffect(() => save(KEYS.deleted, deletedTitles), [deletedTitles])
 
   // Drop cook-queue / progress / active entries that point to recipes which no
   // longer exist (e.g. a recipe deleted on another device, or re-imported with a
@@ -181,13 +189,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // the initial mount, StrictMode's double-invoke, and cloud-hydration writes all
   // leave the stamp untouched — only a real user edit bumps it.
   useEffect(() => {
-    const cur = { recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog }
+    const cur = { recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog, deletedTitles }
     const prev = prevSyncRef.current
     prevSyncRef.current = cur
     if (hydratingRef.current || prev === null) return
     const changed = (Object.keys(cur) as (keyof typeof cur)[]).some((k) => prev[k] !== cur[k])
     if (changed) save(KEYS.updatedAt, new Date().toISOString())
-  }, [recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog])
+  }, [recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog, deletedTitles])
 
   // --- Cloud sync ---
   // Keep a always-fresh snapshot so login can push the current local state up.
@@ -199,6 +207,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     cookQueue,
     cookProgress,
     cookLog,
+    deletedTitles,
   })
   useEffect(() => {
     stateRef.current = {
@@ -209,6 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cookQueue,
       cookProgress,
       cookLog,
+      deletedTitles,
     }
   })
 
@@ -223,6 +233,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveCookId((s.cookQueue ?? [])[0] ?? null)
     setCookProgress(s.cookProgress ?? {})
     setCookLog(s.cookLog ?? [])
+    setDeletedTitles(s.deletedTitles ?? [])
     // Let the immediate post-hydrate save effect skip, then re-enable saving.
     window.setTimeout(() => {
       hydratingRef.current = false
@@ -294,11 +305,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         cookQueue,
         cookProgress,
         cookLog,
+        deletedTitles,
       })
         .then(() => setSyncStatus('synced'))
         .catch(() => setSyncStatus('error'))
     }, 1200)
-  }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog])
+  }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog, deletedTitles])
 
   // iOS suspends a backgrounded PWA before the debounce above can fire, so flush
   // the latest snapshot the moment the app is hidden/closed. Without this, a check
@@ -362,6 +374,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // --- Recipe actions ---
   const addRecipe = useCallback((recipe: Recipe) => {
     setRecipes((prev) => [recipe, ...prev])
+    // Re-adding a title clears any tombstone so it isn't deleted again on sync.
+    const key = normTitle(recipe.title)
+    setDeletedTitles((t) => (t.includes(key) ? t.filter((x) => x !== key) : t))
   }, [])
 
   // Import a batch: refresh recipes that already exist (matched by title, keeping
@@ -390,13 +405,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const addedList = next.slice(existingCount) // genuinely new (deduped within batch)
       const keptList = next.slice(0, existingCount) // existing, some refreshed in place
       setRecipes([...addedList.reverse(), ...keptList])
+      // Importing a title clears any tombstone so it isn't deleted again on sync.
+      const importedKeys = new Set(incoming.map((r) => normTitle(r.title)))
+      setDeletedTitles((t) => t.filter((x) => !importedKeys.has(x)))
       return { added: addedList.length, updated: updatedTitles.size }
     },
     [recipes]
   )
 
   const deleteRecipe = useCallback((id: string) => {
-    setRecipes((prev) => prev.filter((r) => r.id !== id))
+    setRecipes((prev) => {
+      const target = prev.find((r) => r.id === id)
+      if (target) {
+        const key = normTitle(target.title)
+        setDeletedTitles((t) => (t.includes(key) ? t : [...t, key]))
+      }
+      return prev.filter((r) => r.id !== id)
+    })
     setCookQueue((prev) => prev.filter((qid) => qid !== id))
     setActiveCookId((curr) => (curr === id ? null : curr))
   }, [])
