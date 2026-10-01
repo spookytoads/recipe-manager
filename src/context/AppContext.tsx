@@ -157,6 +157,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(KEYS.cookProgress, cookProgress), [cookProgress])
   useEffect(() => save(KEYS.cookLog, cookLog), [cookLog])
 
+  // Drop cook-queue / progress / active entries that point to recipes which no
+  // longer exist (e.g. a recipe deleted on another device, or re-imported with a
+  // new id). Otherwise the Cook tab badge keeps counting a recipe that's gone.
+  useEffect(() => {
+    const ids = new Set(recipes.map((r) => r.id))
+    setCookQueue((prev) => {
+      const pruned = prev.filter((id) => ids.has(id))
+      return pruned.length === prev.length ? prev : pruned
+    })
+    setActiveCookId((prev) => (prev && !ids.has(prev) ? null : prev))
+    setCookProgress((prev) => {
+      const stale = Object.keys(prev).filter((id) => !ids.has(id))
+      if (stale.length === 0) return prev
+      const next = { ...prev }
+      for (const id of stale) delete next[id]
+      return next
+    })
+  }, [recipes])
+
   // Stamp when local data genuinely changes so login can tell whether local or
   // cloud is newer. We compare slice references (not a "skip first run" flag) so
   // the initial mount, StrictMode's double-invoke, and cloud-hydration writes all
