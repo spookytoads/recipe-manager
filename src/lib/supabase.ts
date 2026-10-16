@@ -25,6 +25,8 @@ export interface SyncState {
   cookLog: CookLogEntry[]
   /** Normalized titles of recipes the user deleted — so deletions propagate. */
   deletedTitles?: string[]
+  /** When the activity bundle (shopping/checked/queue/progress) last changed. */
+  activityUpdatedAt?: string
 }
 
 const normTitle = (t: string) => t.trim().toLowerCase()
@@ -54,9 +56,11 @@ export async function fetchCloudState(userId: string): Promise<CloudSnapshot | n
  *
  * Recipes and the cooking journal are treated as additive: the result is the
  * union of both sides (by recipe title / log id), so an empty or stale device
- * can never wipe the other's recipes. Volatile "current activity" (shopping
- * list, checkmarks, multiplier, cook queue/progress) is taken wholesale from
- * whichever side was edited more recently.
+ * can never wipe the other's recipes. The "activity" bundle (shopping list,
+ * checkmarks, serving multiplier, cook queue and cook progress) is taken as a
+ * whole from whichever side touched *activity* most recently — tracked by its
+ * own `activityUpdatedAt` stamp, independent of recipe edits, so editing a
+ * recipe on one device never overwrites shopping/cook state changed on another.
  */
 export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewer: boolean): SyncState {
   const newer = localIsNewer ? local : remote
@@ -85,8 +89,14 @@ export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewe
   for (const e of remote.cookLog ?? []) logById.set(e.id, e)
   for (const e of local.cookLog ?? []) logById.set(e.id, e)
 
-  // Current activity: from the more-recently-edited side.
-  const activity = localIsNewer ? local : remote
+  // Activity bundle: whichever side changed activity most recently wins the
+  // whole bundle. This uses activityUpdatedAt (not the global stamp), so a
+  // recipe edit or a stale device can't clobber shopping/cook state. Falls back
+  // to the global order when a side has no activity stamp yet (legacy data).
+  const la = local.activityUpdatedAt ?? ''
+  const ra = remote.activityUpdatedAt ?? ''
+  const activityLocalNewer = la && ra ? la >= ra : la ? true : ra ? false : localIsNewer
+  const activity = activityLocalNewer ? local : remote
 
   return {
     recipes,
@@ -97,6 +107,7 @@ export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewe
     multiplier: activity.multiplier ?? 1,
     cookQueue: activity.cookQueue ?? [],
     cookProgress: activity.cookProgress ?? {},
+    activityUpdatedAt: (la > ra ? la : ra) || undefined,
   }
 }
 

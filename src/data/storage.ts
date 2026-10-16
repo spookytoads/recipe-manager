@@ -16,6 +16,7 @@ export const KEYS = {
   seeded: `${PREFIX}seeded`,
   updatedAt: `${PREFIX}updated-at`,
   deleted: `${PREFIX}deleted-titles`,
+  activityUpdatedAt: `${PREFIX}activity-updated-at`,
 } as const
 
 export function load<T>(key: string, fallback: T): T {

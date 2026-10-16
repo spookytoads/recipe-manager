@@ -143,6 +143,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
   const normTitle = (t: string) => t.trim().toLowerCase()
 
+  // Timestamp of the last change to the activity bundle (shopping/checked/
+  // multiplier/cook queue/progress), so sync can tell which device touched
+  // activity most recently — independent of recipe edits.
+  const [activityStamp, setActivityStamp] = useState<string>(() =>
+    load<string>(KEYS.activityUpdatedAt, '')
+  )
+  const prevActivityRef = useRef<Record<string, unknown> | null>(null)
+
   // --- Cloud sync ---
   const [user, setUser] = useState<CloudUser | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(
@@ -165,6 +173,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(KEYS.cookProgress, cookProgress), [cookProgress])
   useEffect(() => save(KEYS.cookLog, cookLog), [cookLog])
   useEffect(() => save(KEYS.deleted, deletedTitles), [deletedTitles])
+  useEffect(() => save(KEYS.activityUpdatedAt, activityStamp), [activityStamp])
+
+  // Stamp the activity bundle only when one of its own slices genuinely changes
+  // (same reference-compare guard as the global stamp). This lets sync pick the
+  // device that most recently touched shopping/cook state, so a recipe edit on
+  // another device can't overwrite it.
+  useEffect(() => {
+    const cur = { shopping, checkedKeys, multiplier, cookQueue, cookProgress }
+    const prev = prevActivityRef.current
+    prevActivityRef.current = cur
+    if (hydratingRef.current || prev === null) return
+    const changed = (Object.keys(cur) as (keyof typeof cur)[]).some((k) => prev[k] !== cur[k])
+    if (changed) setActivityStamp(new Date().toISOString())
+  }, [shopping, checkedKeys, multiplier, cookQueue, cookProgress])
 
   // Drop cook-queue / progress / active entries that point to recipes which no
   // longer exist (e.g. a recipe deleted on another device, or re-imported with a
@@ -209,6 +231,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     cookProgress,
     cookLog,
     deletedTitles,
+    activityUpdatedAt: activityStamp,
   })
   useEffect(() => {
     stateRef.current = {
@@ -220,6 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cookProgress,
       cookLog,
       deletedTitles,
+      activityUpdatedAt: activityStamp,
     }
   })
 
@@ -235,6 +259,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCookProgress(s.cookProgress ?? {})
     setCookLog(s.cookLog ?? [])
     setDeletedTitles(s.deletedTitles ?? [])
+    setActivityStamp(s.activityUpdatedAt ?? '')
     // Let the immediate post-hydrate save effect skip, then re-enable saving.
     window.setTimeout(() => {
       hydratingRef.current = false
@@ -307,11 +332,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         cookProgress,
         cookLog,
         deletedTitles,
+        activityUpdatedAt: activityStamp,
       })
         .then(() => setSyncStatus('synced'))
         .catch(() => setSyncStatus('error'))
     }, 1200)
-  }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog, deletedTitles])
+  }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog, deletedTitles, activityStamp])
 
   // iOS suspends a backgrounded PWA before the debounce above can fire, so flush
   // the latest snapshot the moment the app is hidden/closed. Without this, a check
