@@ -44,6 +44,7 @@ interface AppContextValue {
   // Recipes
   recipes: Recipe[]
   addRecipe: (recipe: Recipe) => void
+  updateRecipe: (recipe: Recipe) => void
   importRecipes: (incoming: Recipe[]) => { added: number; updated: number }
   deleteRecipe: (id: string) => void
 
@@ -379,6 +380,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDeletedTitles((t) => (t.includes(key) ? t.filter((x) => x !== key) : t))
   }, [])
 
+  // Replace an existing recipe (matched by id) with an edited version.
+  const updateRecipe = useCallback((recipe: Recipe) => {
+    setRecipes((prev) => prev.map((r) => (r.id === recipe.id ? recipe : r)))
+    // Keeping it present clears any tombstone on its (possibly renamed) title.
+    const key = normTitle(recipe.title)
+    setDeletedTitles((t) => (t.includes(key) ? t.filter((x) => x !== key) : t))
+  }, [])
+
   // Import a batch: refresh recipes that already exist (matched by title, keeping
   // their id so journal/cook references survive) and add the genuinely new ones.
   const importRecipes = useCallback(
@@ -555,6 +564,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSection,
       recipes,
       addRecipe,
+      updateRecipe,
       importRecipes,
       deleteRecipe,
       shopping,
@@ -594,6 +604,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       section,
       recipes,
       addRecipe,
+      updateRecipe,
       importRecipes,
       deleteRecipe,
       shopping,

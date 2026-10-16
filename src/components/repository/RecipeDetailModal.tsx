@@ -10,6 +10,7 @@ import {
   ClockIcon,
   CloseIcon,
   DownloadIcon,
+  EditIcon,
   TrashIcon,
 } from '../ui/icons'
 import { recipeColor } from '../../lib/colors'
@@ -21,9 +22,11 @@ import { reviewsForRecipe } from '../../lib/reviews'
 export function RecipeDetailModal({
   recipe,
   onClose,
+  onEdit,
 }: {
   recipe: Recipe
   onClose: () => void
+  onEdit?: (recipe: Recipe) => void
 }) {
   const { addRecipeToShopping, addToCookQueue, startCooking, pushToast, deleteRecipe, cookLog } =
     useApp()
@@ -250,6 +253,17 @@ export function RecipeDetailModal({
           )}
 
           <div className="mt-6 flex flex-wrap gap-2">
+            {onEdit && (
+              <button
+                onClick={() => {
+                  onEdit(recipe)
+                  onClose()
+                }}
+                className="btn-ghost text-sm text-royal-soft hover:bg-royal/5 hover:text-royal-ink"
+              >
+                <EditIcon width={16} height={16} className="text-pumpkin" /> Edit recipe
+              </button>
+            )}
             <button
               onClick={handleExportPdf}
               className="btn-ghost text-sm text-royal-soft hover:bg-royal/5 hover:text-royal-ink"

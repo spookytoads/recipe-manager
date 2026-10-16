@@ -38,8 +38,15 @@ const emptyStep = (): StepRow => ({ key: uid('row'), instruction: '', minutes: '
 const inputClass =
   'w-full rounded-xl border border-royal/20 bg-white px-3 py-2.5 text-royal-ink outline-none transition-colors placeholder:text-royal-faint focus:border-pumpkin focus:ring-2 focus:ring-pumpkin/20'
 
-export function AddRecipeModal({ onClose }: { onClose: () => void }) {
-  const { addRecipe, pushToast } = useApp()
+export function AddRecipeModal({
+  onClose,
+  editing,
+}: {
+  onClose: () => void
+  /** When provided, the form opens pre-filled and saving updates this recipe. */
+  editing?: Recipe
+}) {
+  const { addRecipe, updateRecipe, pushToast } = useApp()
 
   const [title, setTitle] = useState('')
   const [cuisine, setCuisine] = useState('')
@@ -119,6 +126,12 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
     )
   }
 
+  // When opened in edit mode, pre-fill the form from the recipe being edited.
+  useEffect(() => {
+    if (editing) fillFromRecipe(editing)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
+
   const handleParse = async () => {
     setParseError(null)
     setParsing(true)
@@ -157,7 +170,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
     }
 
     const recipe: Recipe = {
-      id: uid('recipe'),
+      id: editing ? editing.id : uid('recipe'),
       title: title.trim(),
       cuisine: cuisine.trim() || 'Other',
       protein: splitCsv(proteinInput.toLowerCase()),
@@ -193,10 +206,16 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
         }),
       tags: splitCsv(tagsInput),
       ...(anyMacro ? { nutrition } : {}),
-      sourceFile: 'manual-entry',
+      // Keep the original source when editing so the recipe stays in its cookbook.
+      sourceFile: editing ? editing.sourceFile : 'manual-entry',
     }
-    addRecipe(recipe)
-    pushToast(`"${recipe.title}" added to your library`)
+    if (editing) {
+      updateRecipe(recipe)
+      pushToast(`"${recipe.title}" updated`)
+    } else {
+      addRecipe(recipe)
+      pushToast(`"${recipe.title}" added to your library`)
+    }
     onClose()
   }
 
@@ -206,7 +225,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Add a recipe"
+      aria-label={editing ? 'Edit recipe' : 'Add a recipe'}
     >
       <div
         className="flex max-h-[94vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl bg-choc shadow-2xl sm:rounded-3xl"
@@ -214,7 +233,9 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200/70 px-5 py-3.5">
-          <h2 className="text-lg font-extrabold tracking-tight text-slate-800">Add a Recipe</h2>
+          <h2 className="text-lg font-extrabold tracking-tight text-slate-800">
+            {editing ? 'Edit Recipe' : 'Add a Recipe'}
+          </h2>
           <button
             onClick={onClose}
             className="tap-target flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
@@ -485,7 +506,7 @@ export function AddRecipeModal({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
           <button onClick={handleSave} className="btn-primary">
-            Save Recipe
+            {editing ? 'Save Changes' : 'Save Recipe'}
           </button>
         </div>
       </div>

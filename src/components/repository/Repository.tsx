@@ -40,6 +40,7 @@ export function Repository() {
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selected, setSelected] = useState<Recipe | null>(null)
+  const [editing, setEditing] = useState<Recipe | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [adding, setAdding] = useState(false)
   const [roulette, setRoulette] = useState(false)
@@ -359,10 +360,16 @@ export function Repository() {
       )}
 
       {selected && (
-        <RecipeDetailModal recipe={selected} onClose={() => setSelected(null)} />
+        <RecipeDetailModal
+          recipe={selected}
+          onClose={() => setSelected(null)}
+          onEdit={(r) => setEditing(r)}
+        />
       )}
 
       {adding && <AddRecipeModal onClose={() => setAdding(false)} />}
+
+      {editing && <AddRecipeModal editing={editing} onClose={() => setEditing(null)} />}
 
       {roulette && (
         <RouletteModal
