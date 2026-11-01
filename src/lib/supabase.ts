@@ -37,6 +37,21 @@ export interface CloudSnapshot {
   updatedAt: string | null
 }
 
+/**
+ * Cheap "has anything changed?" check: fetch only the row's updated_at, not the
+ * (potentially multi-MB) data blob. Used to skip the full pull when nothing new.
+ */
+export async function fetchCloudUpdatedAt(userId: string): Promise<string | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('app_state')
+    .select('updated_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return (data?.updated_at as string | undefined) ?? null
+}
+
 /** Fetch a user's saved state (with its last-updated time), or null if none yet. */
 export async function fetchCloudState(userId: string): Promise<CloudSnapshot | null> {
   if (!supabase) return null
@@ -111,11 +126,13 @@ export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewe
   }
 }
 
-/** Upsert a user's full state. */
-export async function saveCloudState(userId: string, state: SyncState): Promise<void> {
-  if (!supabase) return
+/** Upsert a user's full state. Returns the updated_at stamp it wrote (or ''). */
+export async function saveCloudState(userId: string, state: SyncState): Promise<string> {
+  if (!supabase) return ''
+  const updatedAt = new Date().toISOString()
   const { error } = await supabase
     .from('app_state')
-    .upsert({ user_id: userId, data: state, updated_at: new Date().toISOString() })
+    .upsert({ user_id: userId, data: state, updated_at: updatedAt })
   if (error) throw error
+  return updatedAt
 }

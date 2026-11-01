@@ -14,6 +14,7 @@ import { SEED_RECIPES } from '../data/seed'
 import { uid } from '../lib/util'
 import {
   fetchCloudState,
+  fetchCloudUpdatedAt,
   isSupabaseConfigured,
   mergeSyncStates,
   saveCloudState,
@@ -82,6 +83,8 @@ interface AppContextValue {
   cloudEnabled: boolean
   user: CloudUser | null
   syncStatus: SyncStatus
+  /** Force an immediate pull of the latest cloud changes. */
+  syncNow: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
   signOut: () => Promise<void>
@@ -159,6 +162,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hydratingRef = useRef(false)
   const saveTimer = useRef<number | null>(null)
   const prevSyncRef = useRef<Record<string, unknown> | null>(null)
+  // The cloud row's updated_at this device last saw or wrote — lets a pull skip
+  // work when nothing changed, and keeps a device from re-pulling its own push.
+  const lastSyncedStampRef = useRef<string>('')
 
   // --- Toasts ---
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -288,10 +294,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const localIsNewer = !!localStamp && (!cloudStamp || localStamp > cloudStamp)
           const merged = mergeSyncStates(stateRef.current, remote.state, localIsNewer)
           applyState(merged)
-          await saveCloudState(u.id, merged)
+          lastSyncedStampRef.current = (await saveCloudState(u.id, merged)) || cloudStamp
         } else {
           // First login for this account — seed the cloud from current local data.
-          await saveCloudState(u.id, stateRef.current)
+          lastSyncedStampRef.current = await saveCloudState(u.id, stateRef.current)
         }
         setSyncStatus('synced')
       } catch {
@@ -300,6 +306,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [applyState]
   )
+
+  // Pull just the new changes from the cloud. Cheap by default: it first checks
+  // the row's updated_at and does nothing when it matches what we last saw, so
+  // reopening the app or the periodic check doesn't re-download the whole blob.
+  // This is read-only (no push), so it can't start a sync loop between devices.
+  const pullFromCloud = useCallback(
+    async (userId: string, force = false) => {
+      if (!supabase) return
+      try {
+        if (!force) {
+          const stamp = await fetchCloudUpdatedAt(userId)
+          if (!stamp || stamp === lastSyncedStampRef.current) return // nothing new
+        }
+        setSyncStatus('syncing')
+        const remote = await fetchCloudState(userId)
+        if (!remote) {
+          setSyncStatus('synced')
+          return
+        }
+        lastSyncedStampRef.current = remote.updatedAt ?? lastSyncedStampRef.current
+        const localStamp = load<string>(KEYS.updatedAt, '')
+        const cloudStamp = remote.updatedAt ?? ''
+        const localIsNewer = !!localStamp && (!cloudStamp || localStamp > cloudStamp)
+        applyState(mergeSyncStates(stateRef.current, remote.state, localIsNewer))
+        setSyncStatus('synced')
+      } catch {
+        setSyncStatus('error')
+      }
+    },
+    [applyState]
+  )
+
+  const syncNow = useCallback(async () => {
+    if (user) await pullFromCloud(user.id, true)
+  }, [user, pullFromCloud])
 
   // Initialize auth: pick up an existing session and watch for changes.
   useEffect(() => {
@@ -316,6 +357,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe()
     }
   }, [handleUser])
+
+  // Keep up to date while open: pull new changes when the app regains focus and
+  // on a light interval. The cheap updated_at check means most of these are a
+  // no-op, so it's only a full download when the cloud actually changed.
+  useEffect(() => {
+    if (!supabase || !user) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void pullFromCloud(user.id)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    const interval = window.setInterval(onVisible, 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(interval)
+    }
+  }, [user, pullFromCloud])
 
   // Push local changes up (debounced) whenever signed in.
   useEffect(() => {
@@ -334,7 +391,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deletedTitles,
         activityUpdatedAt: activityStamp,
       })
-        .then(() => setSyncStatus('synced'))
+        .then((stamp) => {
+          if (stamp) lastSyncedStampRef.current = stamp
+          setSyncStatus('synced')
+        })
         .catch(() => setSyncStatus('error'))
     }, 1200)
   }, [user, recipes, shopping, checkedKeys, multiplier, cookQueue, cookProgress, cookLog, deletedTitles, activityStamp])
@@ -351,7 +411,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         saveTimer.current = null
       }
       save(KEYS.updatedAt, new Date().toISOString())
-      void saveCloudState(user.id, stateRef.current).catch(() => {})
+      void saveCloudState(user.id, stateRef.current)
+        .then((stamp) => {
+          if (stamp) lastSyncedStampRef.current = stamp
+        })
+        .catch(() => {})
     }
     document.addEventListener('visibilitychange', flush)
     window.addEventListener('pagehide', flush)
@@ -619,6 +683,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cloudEnabled: isSupabaseConfigured,
       user,
       syncStatus,
+      syncNow,
       signIn,
       signUp,
       signOut,
@@ -657,6 +722,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       mergeCookLog,
       user,
       syncStatus,
+      syncNow,
       signIn,
       signUp,
       signOut,

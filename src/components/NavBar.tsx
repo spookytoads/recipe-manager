@@ -1,6 +1,6 @@
 import { useApp, type Section } from '../context/AppContext'
 import { aggregateKey } from '../context/AppContext'
-import { BookIcon, CartIcon, ChefIcon, JournalIcon, UserIcon } from './ui/icons'
+import { BookIcon, CartIcon, ChefIcon, JournalIcon, ResetIcon, UserIcon } from './ui/icons'
 import { ChefLogo } from './ui/Logo'
 import { useMemo, useState } from 'react'
 import { AuthModal } from './AuthModal'
@@ -13,7 +13,7 @@ const NAV: { id: Section; label: string; Icon: typeof BookIcon }[] = [
 ]
 
 export function NavBar() {
-  const { section, setSection, shopping, checkedKeys, cookQueue, cloudEnabled, user, syncStatus } =
+  const { section, setSection, shopping, checkedKeys, cookQueue, cloudEnabled, user, syncStatus, syncNow } =
     useApp()
   const [authOpen, setAuthOpen] = useState(false)
 
@@ -78,6 +78,22 @@ export function NavBar() {
             )
           })}
         </nav>
+
+        {cloudEnabled && user && (
+          <button
+            onClick={() => void syncNow()}
+            disabled={syncStatus === 'syncing'}
+            className="tap-target flex shrink-0 items-center justify-center rounded-xl px-2 text-royal-mute hover:bg-white/10 hover:text-choc disabled:opacity-60"
+            aria-label="Sync now"
+            title="Check for and pull the latest changes"
+          >
+            <ResetIcon
+              width={18}
+              height={18}
+              className={syncStatus === 'syncing' ? 'animate-spin' : ''}
+            />
+          </button>
+        )}
 
         {cloudEnabled && (
           <button
