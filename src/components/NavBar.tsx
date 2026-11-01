@@ -13,9 +13,25 @@ const NAV: { id: Section; label: string; Icon: typeof BookIcon }[] = [
 ]
 
 export function NavBar() {
-  const { section, setSection, shopping, checkedKeys, cookQueue, cloudEnabled, user, syncStatus, syncNow } =
+  const { section, setSection, shopping, checkedKeys, cookQueue, cloudEnabled, user, syncStatus, syncNow, pushToast } =
     useApp()
   const [authOpen, setAuthOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  const handleSync = async () => {
+    if (syncing) return
+    setSyncing(true)
+    try {
+      const res = await syncNow()
+      if (!res.ok) {
+        pushToast("Couldn't reach the cloud — check your connection and try again.", 'error')
+      } else {
+        pushToast(`Synced · ${res.count} ${res.count === 1 ? 'recipe' : 'recipes'} in your library`)
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const shoppingRemaining = useMemo(() => {
     const keys = new Set(shopping.map((e) => aggregateKey(e.name, e.unit, e.category)))
@@ -81,17 +97,13 @@ export function NavBar() {
 
         {cloudEnabled && user && (
           <button
-            onClick={() => void syncNow()}
-            disabled={syncStatus === 'syncing'}
+            onClick={() => void handleSync()}
+            disabled={syncing}
             className="tap-target flex shrink-0 items-center justify-center rounded-xl px-2 text-royal-mute hover:bg-white/10 hover:text-choc disabled:opacity-60"
             aria-label="Sync now"
             title="Check for and pull the latest changes"
           >
-            <ResetIcon
-              width={18}
-              height={18}
-              className={syncStatus === 'syncing' ? 'animate-spin' : ''}
-            />
+            <ResetIcon width={18} height={18} className={syncing ? 'animate-spin' : ''} />
           </button>
         )}
 

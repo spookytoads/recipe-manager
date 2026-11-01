@@ -24,6 +24,22 @@ import {
 
 export type SyncStatus = 'off' | 'signed-out' | 'syncing' | 'synced' | 'error'
 
+/** Result of a manual/auto cloud pull, so the UI can give concrete feedback. */
+export interface PullResult {
+  ok: boolean
+  count: number
+  changed?: boolean
+  reason?: 'off' | 'network' | 'signed-out'
+}
+
+/** Reject if a promise doesn't settle in time, so a hung request can't freeze the UI. */
+function withTimeout<T>(p: Promise<T>, ms = 15000): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ])
+}
+
 export interface CloudUser {
   id: string
   email: string
@@ -84,7 +100,7 @@ interface AppContextValue {
   user: CloudUser | null
   syncStatus: SyncStatus
   /** Force an immediate pull of the latest cloud changes. */
-  syncNow: () => Promise<void>
+  syncNow: () => Promise<PullResult>
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
   signOut: () => Promise<void>
@@ -282,7 +298,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser({ id: u.id, email: u.email ?? '' })
       setSyncStatus('syncing')
       try {
-        const remote = await fetchCloudState(u.id)
+        const remote = await withTimeout(fetchCloudState(u.id))
         if (remote) {
           // Merge rather than overwrite: the recipe library and journal are the
           // union of both sides, so an empty/stale device can't wipe the other's
@@ -294,10 +310,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const localIsNewer = !!localStamp && (!cloudStamp || localStamp > cloudStamp)
           const merged = mergeSyncStates(stateRef.current, remote.state, localIsNewer)
           applyState(merged)
-          lastSyncedStampRef.current = (await saveCloudState(u.id, merged)) || cloudStamp
+          lastSyncedStampRef.current = (await withTimeout(saveCloudState(u.id, merged))) || cloudStamp
         } else {
           // First login for this account — seed the cloud from current local data.
-          lastSyncedStampRef.current = await saveCloudState(u.id, stateRef.current)
+          lastSyncedStampRef.current = await withTimeout(saveCloudState(u.id, stateRef.current))
         }
         setSyncStatus('synced')
       } catch {
@@ -312,34 +328,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // reopening the app or the periodic check doesn't re-download the whole blob.
   // This is read-only (no push), so it can't start a sync loop between devices.
   const pullFromCloud = useCallback(
-    async (userId: string, force = false) => {
-      if (!supabase) return
+    async (userId: string, force = false): Promise<PullResult> => {
+      if (!supabase) return { ok: false, reason: 'off', count: 0 }
       try {
         if (!force) {
-          const stamp = await fetchCloudUpdatedAt(userId)
-          if (!stamp || stamp === lastSyncedStampRef.current) return // nothing new
+          const stamp = await withTimeout(fetchCloudUpdatedAt(userId))
+          if (!stamp || stamp === lastSyncedStampRef.current) {
+            return { ok: true, changed: false, count: stateRef.current.recipes.length }
+          }
         }
         setSyncStatus('syncing')
-        const remote = await fetchCloudState(userId)
+        const remote = await withTimeout(fetchCloudState(userId))
         if (!remote) {
           setSyncStatus('synced')
-          return
+          return { ok: true, changed: false, count: 0 }
         }
         lastSyncedStampRef.current = remote.updatedAt ?? lastSyncedStampRef.current
         const localStamp = load<string>(KEYS.updatedAt, '')
         const cloudStamp = remote.updatedAt ?? ''
         const localIsNewer = !!localStamp && (!cloudStamp || localStamp > cloudStamp)
-        applyState(mergeSyncStates(stateRef.current, remote.state, localIsNewer))
+        const merged = mergeSyncStates(stateRef.current, remote.state, localIsNewer)
+        applyState(merged)
         setSyncStatus('synced')
+        return { ok: true, changed: true, count: merged.recipes.length }
       } catch {
         setSyncStatus('error')
+        return { ok: false, reason: 'network', count: 0 }
       }
     },
     [applyState]
   )
 
-  const syncNow = useCallback(async () => {
-    if (user) await pullFromCloud(user.id, true)
+  const syncNow = useCallback(async (): Promise<PullResult> => {
+    if (!user) return { ok: false, reason: 'signed-out', count: 0 }
+    return pullFromCloud(user.id, true)
   }, [user, pullFromCloud])
 
   // Initialize auth: pick up an existing session and watch for changes.
