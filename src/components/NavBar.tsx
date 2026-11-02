@@ -25,6 +25,12 @@ export function NavBar() {
       const res = await syncNow()
       if (!res.ok) {
         pushToast("Couldn't reach the cloud — check your connection and try again.", 'error')
+      } else if (res.persisted != null && res.persisted !== res.count) {
+        // Pulled fine but couldn't save to this device (e.g. storage full).
+        pushToast(
+          `Pulled ${res.count} recipes but this device could only save ${res.persisted === -1 ? 0 : res.persisted} — storage issue.`,
+          'error'
+        )
       } else {
         pushToast(`Synced · ${res.count} ${res.count === 1 ? 'recipe' : 'recipes'} in your library`)
       }

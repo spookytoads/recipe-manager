@@ -29,6 +29,8 @@ export interface PullResult {
   ok: boolean
   count: number
   changed?: boolean
+  /** How many recipes actually persisted to local storage (-1 = storage error). */
+  persisted?: number
   reason?: 'off' | 'network' | 'signed-out'
 }
 
@@ -350,7 +352,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const merged = mergeSyncStates(stateRef.current, remote.state, localIsNewer)
         applyState(merged)
         setSyncStatus('synced')
-        return { ok: true, changed: true, count: merged.recipes.length }
+        // Write the library to this device's storage and read it straight back,
+        // so we can tell a storage failure (e.g. iOS quota) apart from a display
+        // issue: `persisted` is how many actually made it into localStorage.
+        let persisted = merged.recipes.length
+        try {
+          save(KEYS.recipes, merged.recipes)
+          persisted = load<Recipe[]>(KEYS.recipes, []).length
+        } catch {
+          persisted = -1
+        }
+        return { ok: true, changed: true, count: merged.recipes.length, persisted }
       } catch {
         setSyncStatus('error')
         return { ok: false, reason: 'network', count: 0 }
