@@ -20,11 +20,6 @@ import { AddRecipeModal } from './AddRecipeModal'
 import { ImportExport } from './ImportExport'
 import { RouletteModal } from '../roulette/RouletteModal'
 import { AuthModal } from '../AuthModal'
-import { KEYS, load } from '../../data/storage'
-
-// Bumped each deploy so the on-screen diagnostic confirms a device is on the
-// latest build (vs. a stale cached one).
-const BUILD = 'diag-2'
 
 type CookedFilter = 'all' | 'cooked' | 'uncooked'
 type SortKey = 'newest' | 'rating' | 'title'
@@ -36,7 +31,7 @@ const COOKED_FILTERS: { id: CookedFilter; label: string }[] = [
 ]
 
 export function Repository() {
-  const { recipes, cookLog, cloudEnabled, user, syncStatus } = useApp()
+  const { recipes, cookLog, cloudEnabled, user } = useApp()
   const [authOpen, setAuthOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ProteinFilter>('All')
@@ -51,16 +46,6 @@ export function Repository() {
   const [extracting, setExtracting] = useState(false)
   const [adding, setAdding] = useState(false)
   const [roulette, setRoulette] = useState(false)
-
-  // How many recipes are actually in this device's storage (for the diagnostic
-  // line) — distinguishes "in memory but not saved" from "not loaded at all".
-  const storedRecipeCount = useMemo(() => {
-    try {
-      return load<Recipe[]>(KEYS.recipes, []).length
-    } catch {
-      return -1
-    }
-  }, [recipes])
 
   // Per-recipe cook count + average rating from the journal.
   const stats = useMemo(() => {
@@ -149,12 +134,6 @@ export function Repository() {
           <p className="mt-1 text-sm text-royal-mute">
             {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
           </p>
-          {cloudEnabled && (
-            <p className="mt-0.5 break-all font-mono text-[10px] text-royal-mute/50">
-              {BUILD} · mem {recipes.length} · saved {storedRecipeCount} ·{' '}
-              {user ? `as ${user.email}` : 'signed out'} · {syncStatus}
-            </p>
-          )}
           <button
             onClick={() => setRoulette(true)}
             disabled={recipes.length === 0}
