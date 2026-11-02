@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { compressToBase64, decompressFromBase64 } from 'lz-string'
 import type { CookLogEntry, CookProgress, Recipe, ShoppingEntry } from '../types'
 
 const url = import.meta.env.VITE_SUPABASE_URL
@@ -61,7 +62,14 @@ export async function fetchCloudState(userId: string): Promise<CloudSnapshot | n
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error
-  const state = data?.data as SyncState | undefined
+  const raw = data?.data
+  if (raw == null) return null
+  // New rows store the state LZ-compressed (a string, ~4x smaller to transfer);
+  // older rows stored the raw JSON object. Handle both.
+  const state =
+    typeof raw === 'string'
+      ? (JSON.parse(decompressFromBase64(raw) || 'null') as SyncState | null)
+      : (raw as SyncState)
   if (!state) return null
   return { state, updatedAt: (data?.updated_at as string | undefined) ?? null }
 }
@@ -130,9 +138,12 @@ export function mergeSyncStates(local: SyncState, remote: SyncState, localIsNewe
 export async function saveCloudState(userId: string, state: SyncState): Promise<string> {
   if (!supabase) return ''
   const updatedAt = new Date().toISOString()
+  // Store compressed (~4x smaller) so the transfer is quick even on a weak phone
+  // connection; fetchCloudState handles both compressed strings and legacy JSON.
+  const data = compressToBase64(JSON.stringify(state))
   const { error } = await supabase
     .from('app_state')
-    .upsert({ user_id: userId, data: state, updated_at: updatedAt })
+    .upsert({ user_id: userId, data, updated_at: updatedAt })
   if (error) throw error
   return updatedAt
 }

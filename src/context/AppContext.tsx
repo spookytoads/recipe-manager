@@ -35,7 +35,7 @@ export interface PullResult {
 }
 
 /** Reject if a promise doesn't settle in time, so a hung request can't freeze the UI. */
-function withTimeout<T>(p: Promise<T>, ms = 15000): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms = 45000): Promise<T> {
   return Promise.race([
     p,
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
