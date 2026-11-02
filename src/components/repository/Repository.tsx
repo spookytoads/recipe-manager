@@ -24,7 +24,7 @@ import { KEYS, load } from '../../data/storage'
 
 // Bumped each deploy so the on-screen diagnostic confirms a device is on the
 // latest build (vs. a stale cached one).
-const BUILD = 'diag-1'
+const BUILD = 'diag-2'
 
 type CookedFilter = 'all' | 'cooked' | 'uncooked'
 type SortKey = 'newest' | 'rating' | 'title'
@@ -150,9 +150,9 @@ export function Repository() {
             {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'} in your library
           </p>
           {cloudEnabled && (
-            <p className="mt-0.5 font-mono text-[10px] text-royal-mute/50">
+            <p className="mt-0.5 break-all font-mono text-[10px] text-royal-mute/50">
               {BUILD} · mem {recipes.length} · saved {storedRecipeCount} ·{' '}
-              {user ? 'signed in' : 'signed out'} · {syncStatus}
+              {user ? `as ${user.email}` : 'signed out'} · {syncStatus}
             </p>
           )}
           <button
