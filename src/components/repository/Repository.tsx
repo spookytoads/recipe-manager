@@ -19,6 +19,7 @@ import { PdfUpload } from './PdfUpload'
 import { AddRecipeModal } from './AddRecipeModal'
 import { ImportExport } from './ImportExport'
 import { RouletteModal } from '../roulette/RouletteModal'
+import { AuthModal } from '../AuthModal'
 
 type CookedFilter = 'all' | 'cooked' | 'uncooked'
 type SortKey = 'newest' | 'rating' | 'title'
@@ -30,7 +31,8 @@ const COOKED_FILTERS: { id: CookedFilter; label: string }[] = [
 ]
 
 export function Repository() {
-  const { recipes, cookLog } = useApp()
+  const { recipes, cookLog, cloudEnabled, user } = useApp()
+  const [authOpen, setAuthOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ProteinFilter>('All')
   const [cookedFilter, setCookedFilter] = useState<CookedFilter>('all')
@@ -338,7 +340,11 @@ export function Repository() {
       {extracting && !hasRecipes ? (
         <SkeletonGrid />
       ) : !hasRecipes ? (
-        <EmptyLibrary onAdd={() => setAdding(true)} />
+        <EmptyLibrary
+          onAdd={() => setAdding(true)}
+          signedOut={cloudEnabled && !user}
+          onSignIn={() => setAuthOpen(true)}
+        />
       ) : filtered.length === 0 ? (
         <NoMatches
           onReset={() => {
@@ -370,6 +376,8 @@ export function Repository() {
       {adding && <AddRecipeModal onClose={() => setAdding(false)} />}
 
       {editing && <AddRecipeModal editing={editing} onClose={() => setEditing(null)} />}
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
       {roulette && (
         <RouletteModal
@@ -418,7 +426,33 @@ function SkeletonGrid() {
   )
 }
 
-function EmptyLibrary({ onAdd }: { onAdd: () => void }) {
+function EmptyLibrary({
+  onAdd,
+  signedOut,
+  onSignIn,
+}: {
+  onAdd: () => void
+  signedOut: boolean
+  onSignIn: () => void
+}) {
+  // Signed out with cloud enabled: the library is almost certainly in the cloud,
+  // not actually empty — guide the user to sign in rather than to add recipes.
+  if (signedOut) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-choc/25 bg-white/5 px-6 py-16 text-center">
+        <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-choc">
+          <BookIcon width={32} height={32} />
+        </span>
+        <h2 className="text-lg font-bold text-choc">Sign in to load your recipes</h2>
+        <p className="mt-1 max-w-xs text-sm text-royal-mute">
+          Your recipes are saved to your account. Sign in to sync them to this device.
+        </p>
+        <button onClick={onSignIn} className="btn-primary mt-4">
+          Sign in
+        </button>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-choc/25 bg-white/5 px-6 py-16 text-center">
       <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-choc">
